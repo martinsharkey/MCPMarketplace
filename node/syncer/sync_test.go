@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
+	"innovox.uk/assured/internal/conformance"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 var now = time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
 
 func TestApplyListsValidCert(t *testing.T) {
+	conformance.Covers(t, "IAS-INV-01")
 	p := testpki.New(now)
 	st := NewState()
 	if err := Apply(st, p.Feed(1, []attest.Envelope{p.Cert("uk.example/echo", testpki.EchoTools(), now)}, nil), p.RootPub, now); err != nil {
@@ -28,6 +30,7 @@ func TestApplyListsValidCert(t *testing.T) {
 }
 
 func TestApplyRejectsReplay(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-02")
 	p := testpki.New(now)
 	st := NewState()
 	f := p.Feed(1, nil, nil)
@@ -40,6 +43,7 @@ func TestApplyRejectsReplay(t *testing.T) {
 }
 
 func TestApplySkipsExpiredCert(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-06")
 	p := testpki.New(now)
 	st := NewState()
 	old := p.Cert("uk.example/old", testpki.EchoTools(), now.AddDate(-2, 0, 0))
@@ -52,6 +56,7 @@ func TestApplySkipsExpiredCert(t *testing.T) {
 }
 
 func TestApplyMarksRevoked(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-05")
 	p := testpki.New(now)
 	st := NewState()
 	c := p.Cert("uk.example/echo", testpki.EchoTools(), now)
@@ -65,6 +70,7 @@ func TestApplyMarksRevoked(t *testing.T) {
 }
 
 func TestApplyRejectsForgedFeed(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01", "IAS-TRUST-02")
 	p := testpki.New(now)
 	st := NewState()
 	_ = Apply(st, p.Feed(1, []attest.Envelope{p.Cert("uk.example/echo", testpki.EchoTools(), now)}, nil), p.RootPub, now)
@@ -78,6 +84,7 @@ func TestApplyRejectsForgedFeed(t *testing.T) {
 }
 
 func TestApplySkipsCertFromUntrustedSigner(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	p, evil := testpki.New(now), testpki.New(now)
 	st := NewState()
 	if err := Apply(st, p.Feed(1, []attest.Envelope{evil.Cert("uk.example/evil", testpki.EchoTools(), now)}, nil), p.RootPub, now); err != nil {
@@ -89,6 +96,7 @@ func TestApplySkipsCertFromUntrustedSigner(t *testing.T) {
 }
 
 func TestStateStaleAfterGrace(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-01")
 	p := testpki.New(now)
 	st := NewState()
 	_ = Apply(st, p.Feed(1, nil, nil), p.RootPub, now)
@@ -116,6 +124,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 }
 
 func TestApplyRejectsFutureDatedFeed(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-02")
 	p := testpki.New(now.Add(48 * time.Hour))
 	st := NewState()
 	if err := Apply(st, p.Feed(1, nil, nil), p.RootPub, now); err == nil {

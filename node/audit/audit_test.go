@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"innovox.uk/assured/internal/conformance"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,7 @@ func logWith(t *testing.T, n int) string {
 }
 
 func TestAppendChains(t *testing.T) {
+	conformance.Covers(t, "IAS-AUD-02")
 	p := filepath.Join(t.TempDir(), "audit.log")
 	l, _ := Open(p)
 	defer l.Close()
@@ -38,6 +40,7 @@ func TestAppendChains(t *testing.T) {
 }
 
 func TestVerifyDetectsEdit(t *testing.T) {
+	conformance.Covers(t, "IAS-AUD-02")
 	p := logWith(t, 3)
 	b, _ := os.ReadFile(p)
 	os.WriteFile(p, []byte(strings.Replace(string(b), `"decision":"allow"`, `"decision":"deny"`, 1)), 0o600)
@@ -47,6 +50,7 @@ func TestVerifyDetectsEdit(t *testing.T) {
 }
 
 func TestVerifyDetectsDeletion(t *testing.T) {
+	conformance.Covers(t, "IAS-AUD-02")
 	p := logWith(t, 3)
 	b, _ := os.ReadFile(p)
 	lines := strings.SplitAfter(string(b), "\n")
@@ -73,6 +77,7 @@ func TestReopenContinuesChain(t *testing.T) {
 }
 
 func TestOpenRefusesTamperedLog(t *testing.T) {
+	conformance.Covers(t, "IAS-AUD-02")
 	p := logWith(t, 2)
 	b, _ := os.ReadFile(p)
 	os.WriteFile(p, []byte(strings.Replace(string(b), `"actor":"agent-1"`, `"actor":"agent-2"`, 1)), 0o600)

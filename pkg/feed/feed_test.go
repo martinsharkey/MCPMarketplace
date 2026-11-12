@@ -3,6 +3,7 @@ package feed
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"innovox.uk/assured/internal/conformance"
 	"path/filepath"
 	"testing"
 	"time"
@@ -46,6 +47,7 @@ func TestFeedRoundTrip(t *testing.T) {
 }
 
 func TestOpenRejectsFeedSignedByRoot(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	k := mk(t)
 	env, _ := Sign(Index{Seq: 1, CreatedAt: now, Delegations: []attest.Envelope{k.delegation}}, trust.KeyID(k.rootPub), k.rootPriv)
 	if _, err := Open(env, trust.NewKeyring(k.rootPub), now); err == nil {
@@ -54,6 +56,7 @@ func TestOpenRejectsFeedSignedByRoot(t *testing.T) {
 }
 
 func TestOpenRejectsForeignDelegation(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	k := mk(t)
 	evil := mk(t)
 	env, _ := Sign(Index{Seq: 1, CreatedAt: now, Delegations: []attest.Envelope{evil.delegation}}, evil.sID, evil.sPriv)
@@ -63,6 +66,7 @@ func TestOpenRejectsForeignDelegation(t *testing.T) {
 }
 
 func TestBundleRoundTrip(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-04")
 	k := mk(t)
 	env, _ := Sign(Index{Seq: 1, CreatedAt: now, Delegations: []attest.Envelope{k.delegation}}, k.sID, k.sPriv)
 	p := filepath.Join(t.TempDir(), "bundle.json")

@@ -3,6 +3,7 @@ package trust
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"innovox.uk/assured/internal/conformance"
 	"testing"
 	"time"
 )
@@ -31,6 +32,7 @@ func TestDelegationAccepted(t *testing.T) {
 }
 
 func TestDelegationNotSignedByRootRejected(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	rootPub, _ := gen(t)
 	_, evilPriv := gen(t)
 	sPub, _ := gen(t)
@@ -44,6 +46,7 @@ func TestDelegationNotSignedByRootRejected(t *testing.T) {
 }
 
 func TestExpiredDelegationExcluded(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	rootPub, rootPriv := gen(t)
 	sPub, _ := gen(t)
 	kr := NewKeyring(rootPub)
@@ -54,6 +57,7 @@ func TestExpiredDelegationExcluded(t *testing.T) {
 }
 
 func TestRootNotInSignerKeys(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	rootPub, rootPriv := gen(t)
 	sPub, _ := gen(t)
 	kr := NewKeyring(rootPub)

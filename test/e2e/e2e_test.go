@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"innovox.uk/assured/internal/conformance"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,6 +37,7 @@ func writeJSON(t *testing.T, path string, v any) {
 }
 
 func TestEndToEnd(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-02", "IAS-TRUST-04", "IAS-TRUST-05", "IAS-AUD-01", "IAS-AUD-02")
 	now := time.Now().UTC()
 	digest := "sha256:" + strings.Repeat("f", 64)
 

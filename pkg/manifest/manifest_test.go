@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"encoding/json"
+	"innovox.uk/assured/internal/conformance"
 	"testing"
 )
 
@@ -33,6 +34,7 @@ func tools(desc string) []Tool {
 }
 
 func TestHashIgnoresOrderAndWhitespace(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-02")
 	a := tools("Echo text")
 	b := []Tool{
 		{Name: "add", Description: "Add numbers", InputSchema: json.RawMessage("{ \"type\" : \"object\" }")},
@@ -52,6 +54,7 @@ func TestHashIgnoresOrderAndWhitespace(t *testing.T) {
 }
 
 func TestHashChangesOnDescription(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-02")
 	h1, _ := HashTools(tools("Echo text"))
 	h2, _ := HashTools(tools("Echo text."))
 	if h1 == h2 {
@@ -60,6 +63,7 @@ func TestHashChangesOnDescription(t *testing.T) {
 }
 
 func TestHashDetectsZeroWidthChar(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-02")
 	h1, _ := HashTools(tools("Echo text"))
 	h2, _ := HashTools(tools("Echo​ text"))
 	if h1 == h2 {
@@ -107,6 +111,7 @@ func TestCanonicalizeNumbersES6(t *testing.T) {
 }
 
 func TestCanonicalizeRejectsDuplicateKeys(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-02", "IAS-RT-05")
 	if _, err := Canonicalize([]byte(`{"type":"EVIL","type":"object"}`)); err == nil {
 		t.Fatal("duplicate keys accepted")
 	}
