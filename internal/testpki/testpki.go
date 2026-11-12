@@ -53,8 +53,13 @@ func (p *PKI) Cert(name string, tools []manifest.Tool, issuedAt time.Time) attes
 
 // Feed signs an index with the given seq, certs and revocations.
 func (p *PKI) Feed(seq uint64, certs []attest.Envelope, revs []feed.Revocation) attest.Envelope {
-	env, err := feed.Sign(feed.Index{Seq: seq, CreatedAt: p.Now, Delegations: []attest.Envelope{p.Delegation},
-		Certificates: certs, Revocations: revs}, p.SignerID, p.SignerPriv)
+	return p.FeedWith(seq, certs, revs, nil, nil)
+}
+
+// FeedWith is Feed with extra delegations and signer-key revocations.
+func (p *PKI) FeedWith(seq uint64, certs []attest.Envelope, revs []feed.Revocation, extraDelegations, keyRevocations []attest.Envelope) attest.Envelope {
+	env, err := feed.Sign(feed.Index{Seq: seq, CreatedAt: p.Now, Delegations: append([]attest.Envelope{p.Delegation}, extraDelegations...),
+		Certificates: certs, Revocations: revs, KeyRevocations: keyRevocations}, p.SignerID, p.SignerPriv)
 	if err != nil {
 		panic(err)
 	}

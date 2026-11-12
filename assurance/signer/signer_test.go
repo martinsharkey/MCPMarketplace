@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"innovox.uk/assured/internal/conformance"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +47,7 @@ func open(t *testing.T, s Signer, keys map[string]ed25519.PublicKey, r Request) 
 }
 
 func TestIssueT1Auto(t *testing.T) {
+	conformance.Covers(t, "IAS-GOV-02")
 	s, keys := setup(t)
 	st := open(t, s, keys, req("T1"))
 	c := st.Predicate
@@ -59,6 +61,7 @@ func TestIssueT1Auto(t *testing.T) {
 }
 
 func TestIssueT2RequiresAssessor(t *testing.T) {
+	conformance.Covers(t, "IAS-GOV-02")
 	s, keys := setup(t)
 	if _, err := s.Issue(req("T2")); err == nil {
 		t.Fatal("T2 without assessor issued")
@@ -71,6 +74,7 @@ func TestIssueT2RequiresAssessor(t *testing.T) {
 }
 
 func TestIssueRejectsT3(t *testing.T) {
+	conformance.Covers(t, "IAS-GOV-02")
 	s, _ := setup(t)
 	r := req("T3")
 	r.Assessor = "x"
@@ -80,6 +84,7 @@ func TestIssueRejectsT3(t *testing.T) {
 }
 
 func TestRemoteCappedAtT1(t *testing.T) {
+	conformance.Covers(t, "IAS-GOV-02")
 	s, _ := setup(t)
 	r := req("T2")
 	r.Assessor, r.ImageDigest, r.RemoteURL = "x", "", "https://svc.example/mcp"

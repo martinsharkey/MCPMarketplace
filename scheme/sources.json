@@ -1,0 +1,254 @@
+{
+  "sources": [
+    {
+      "id": "SBD",
+      "title": "Secure by Design Principles",
+      "publisher": "Government Cyber Unit (security.gov.uk)",
+      "version": "Page updated 18 February 2026",
+      "url": "https://www.security.gov.uk/policy-and-guidance/secure-by-design/principles/",
+      "verified": "2026-11-12",
+      "clauses": {
+        "SBD-P1": "Create responsibility for cyber security risk",
+        "SBD-P2": "Source secure technology products",
+        "SBD-P3": "Adopt a risk-driven approach",
+        "SBD-P4": "Design usable security controls",
+        "SBD-P5": "Build in detect and respond security",
+        "SBD-P6": "Design flexible architectures",
+        "SBD-P7": "Minimise the attack surface",
+        "SBD-P8": "Defend in depth",
+        "SBD-P9": "Embed continuous assurance",
+        "SBD-P10": "Make changes securely"
+      }
+    },
+    {
+      "id": "JSP936",
+      "title": "JSP 936 Dependable Artificial Intelligence (AI) in Defence, Part 1: Directive",
+      "publisher": "Ministry of Defence",
+      "version": "V1.1, November 2024",
+      "url": "https://assets.publishing.service.gov.uk/media/6735fc89f6920bfb5abc7b62/JSP936_Part1.pdf",
+      "verified": "2026-11-12",
+      "clauses": {
+        "JSP936-79": "Analyse reasonable security threats incl. development environments, supply chains and data chains (must)",
+        "JSP936-80": "Put appropriate guards and mitigations in place across development and use (must)",
+        "JSP936-81": "Minimise adversarial attack surface; communicate known vulnerabilities to the risk owner (must)",
+        "JSP936-82": "Analyse failure modes, mitigate in design, communicate residual risk (must)",
+        "JSP936-141": "Undertake a Hazard Analysis including data failure modes (must)",
+        "JSP936-161": "Assure and record data provenance from collection to ingestion (must)",
+        "JSP936-165": "Accompany models with assumptions, dependencies, known errors, weaknesses and ODD (must)",
+        "JSP936-170": "Demonstrate performance across the full ODD including boundaries and edge cases (must)",
+        "JSP936-171": "Demonstrate safe behaviour for inputs outside the ODD (must)",
+        "JSP936-172": "Regression-test existing and new behaviours after updates (must)",
+        "JSP936-178": "Provide specific Security Operating Procedures (SyOPs) for AI products (must)",
+        "JSP936-179": "Monitor the operational environment and AI performance (must)",
+        "JSP936-195": "Secure by Design is required for AI-based information capabilities",
+        "JSP936-196": "Analyse AI-specific security risks such as data poisoning early (must)",
+        "JSP936-197": "Security analyses cover conventional risks and adversarial interference (must)",
+        "JSP936-198": "Externally acquired AI reaches the same confidence as internally developed AI (must)",
+        "JSP936-200": "Require suppliers to demonstrate competence commensurate with use (must)",
+        "JSP936-201": "Suppliers using third-party software argue confidence is not undermined (must)",
+        "JSP936-206": "Undertake assurance commensurate with tolerable risk; do not adopt where too high (must)",
+        "JSP936-209": "Assurance includes behaviour under expected ODD excursions such as adversarial action (must)"
+      }
+    },
+    {
+      "id": "ETSI",
+      "title": "ETSI EN 304 223 Securing AI; Baseline Cyber Security Requirements for AI Models and Systems",
+      "publisher": "ETSI",
+      "version": "V2.1.1 (2025-12)",
+      "url": "https://www.etsi.org/deliver/etsi_en/304200_304299/304223/02.01.01_60/en_304223v020101p.pdf",
+      "verified": "2026-11-12",
+      "clauses": {
+        "ETSI-5.1.2-3": "Maintain an audit trail of models, datasets and prompts",
+        "ETSI-5.1.2-4": "Assess AI-specific risks in external components",
+        "ETSI-5.1.2-6": "Limit and risk-assess the AI system's permissions on other systems",
+        "ETSI-5.1.2-7": "Perform due diligence on external providers",
+        "ETSI-5.1.4-1": "Build in capabilities that allow human oversight",
+        "ETSI-5.1.4-3": "Build, verify and maintain technical measures where oversight is a control",
+        "ETSI-5.2.1-1": "Keep a complete asset inventory including dependencies",
+        "ETSI-5.2.1-2": "Track, authenticate, version and secure AI assets",
+        "ETSI-5.2.2-1": "Review access controls; secure APIs, models, data and pipelines",
+        "ETSI-5.2.2-2": "Apply API controls such as rate limits",
+        "ETSI-5.2.2-4": "Publish a vulnerability disclosure policy",
+        "ETSI-5.2.2-5": "Create, test and maintain incident management and recovery plans",
+        "ETSI-5.2.3-1": "Follow secure software supply chain processes",
+        "ETSI-5.2.3-2": "Document reasons for using poorly documented or unsecured components",
+        "ETSI-5.2.4-1.2": "Publish cryptographic hashes for shared model components",
+        "ETSI-5.2.4-3": "Keep an audit log of changes to prompts and configuration",
+        "ETSI-5.2.5-1": "Security-assess all systems before release",
+        "ETSI-5.2.5-2.1": "Use independent, skilled security testers",
+        "ETSI-5.2.5-4.1": "Prevent outputs giving unintended control over the system",
+        "ETSI-5.3.1-2.1": "Provide appropriate-use guidance, limitations and failure modes",
+        "ETSI-5.4.1-1": "Provide security patches and notify System Operators",
+        "ETSI-5.4.1-2": "Treat major updates as new models requiring fresh security testing",
+        "ETSI-5.4.2-1": "Log system and user actions for compliance and investigations",
+        "ETSI-5.4.2-2": "Analyse logs for drift, poisoning, anomalies and breaches"
+      }
+    },
+    {
+      "id": "SSCOP",
+      "title": "Software Security Code of Practice",
+      "publisher": "DSIT / NCSC",
+      "version": "Published 7 May 2025, updated 15 January 2026",
+      "url": "https://www.gov.uk/government/publications/software-security-code-of-practice/software-security-code-of-practice",
+      "verified": "2026-11-12",
+      "clauses": {
+        "SSCOP-1.1": "Follow an established secure development framework",
+        "SSCOP-1.2": "Understand the composition of the software and assess third-party risks",
+        "SSCOP-1.3": "Have a clear process for testing software and updates before distribution",
+        "SSCOP-1.4": "Follow secure by design and secure by default principles",
+        "SSCOP-2.1": "Protect the build environment against unauthorised access",
+        "SSCOP-2.2": "Control and log changes to the build environment",
+        "SSCOP-3.1": "Distribute software securely to customers",
+        "SSCOP-3.2": "Implement and publish an effective vulnerability disclosure process",
+        "SSCOP-3.3": "Detect, prioritise and manage vulnerabilities",
+        "SSCOP-3.5": "Provide timely security updates, patches and notifications",
+        "SSCOP-4.1": "Specify the level of support and maintenance provided"
+      }
+    },
+    {
+      "id": "OWASP-MCP",
+      "title": "OWASP MCP Top 10",
+      "publisher": "OWASP Foundation",
+      "version": "2025 list, beta",
+      "url": "https://owasp.org/www-project-mcp-top-10/",
+      "verified": "2026-11-12",
+      "clauses": {
+        "MCP01": "Token Mismanagement & Secret Exposure",
+        "MCP02": "Privilege Escalation via Scope Creep",
+        "MCP03": "Tool Poisoning",
+        "MCP04": "Software Supply Chain Attacks & Dependency Tampering",
+        "MCP05": "Command Injection & Execution",
+        "MCP06": "Prompt Injection via Contextual Payloads",
+        "MCP07": "Insufficient Authentication & Authorization",
+        "MCP08": "Lack of Audit and Telemetry",
+        "MCP09": "Shadow MCP Servers",
+        "MCP10": "Context Injection & Over-Sharing"
+      },
+      "note": "Beta: item wording may change before final release."
+    },
+    {
+      "id": "OWASP-ASI",
+      "title": "OWASP Top 10 for Agentic Applications",
+      "publisher": "OWASP GenAI Security Project",
+      "version": "2026 edition, December 2025",
+      "url": "https://www.giskard.ai/knowledge/owasp-top-10-for-agentic-application-2026",
+      "verified": "2026-11-12",
+      "clauses": {
+        "ASI01": "Agent Goal Hijack",
+        "ASI02": "Tool Misuse and Exploitation",
+        "ASI03": "Identity and Privilege Abuse",
+        "ASI04": "Agentic Supply Chain Vulnerabilities",
+        "ASI05": "Unexpected Code Execution (RCE)",
+        "ASI06": "Memory & Context Poisoning",
+        "ASI07": "Insecure Inter-Agent Communication",
+        "ASI08": "Cascading Failures",
+        "ASI09": "Human-Agent Trust Exploitation",
+        "ASI10": "Rogue Agents"
+      },
+      "note": "Item list confirmed from a secondary source; primary genai.owasp.org PDF not fetched."
+    },
+    {
+      "id": "COSAI",
+      "title": "Model Context Protocol (MCP) Security, CoSAI Workstream 4",
+      "publisher": "Coalition for Secure AI (OASIS)",
+      "version": "Draft, 8 January 2026",
+      "url": "https://www.coalitionforsecureai.org/wp-content/uploads/2026/03/model-context-protocol-security-1.pdf",
+      "verified": "2026-11-12",
+      "clauses": {
+        "MCP-T1": "Improper Authentication and Identity Management",
+        "MCP-T2": "Missing or Improper Access Control",
+        "MCP-T3": "Input Validation/Sanitization Failures",
+        "MCP-T4": "Input/Instruction Boundary Distinction Failure",
+        "MCP-T5": "Inadequate Data Protection and Confidentiality Controls",
+        "MCP-T6": "Missing Integrity/Verification Controls",
+        "MCP-T7": "Session and Transport Security Failures",
+        "MCP-T8": "Network Binding/Isolation Failures",
+        "MCP-T9": "Trust Boundary and Privilege Design Failures",
+        "MCP-T10": "Resource Management/Rate Limiting Absence",
+        "MCP-T11": "Supply Chain and Lifecycle Security Failures",
+        "MCP-T12": "Insufficient Logging, Monitoring, and Auditability"
+      },
+      "note": "Draft status at time of verification."
+    },
+    {
+      "id": "NSA-MCP",
+      "title": "Model Context Protocol (MCP): Security Design Considerations for AI-Driven Automation",
+      "publisher": "NSA (U/OO/6030316-26)",
+      "version": "Ver. 1.0, May 2026",
+      "url": "https://www.nsa.gov/Portals/75/documents/Cybersecurity/CSI_MCP_SECURITY.pdf",
+      "verified": "2026-11-12",
+      "clauses": {
+        "NSA-SUPPORTED": "Choose supported MCP projects; strict code audit; enrol via registry",
+        "NSA-BOUNDARIES": "Design for trust boundaries; caution with dynamic tool discovery; classification zones; egress proxy/DLP",
+        "NSA-PARAMS": "Validate parameters against schemas, ranges and context",
+        "NSA-SANDBOX": "Constrain and sandbox tool execution; least privilege; deny unneeded fs/network",
+        "NSA-SIGN": "Sign and verify messages; time-bound signatures; replay protection",
+        "NSA-OUTPUT": "Filter and monitor outputs; length checks; rate limiting; detect indirect injection",
+        "NSA-LOGGING": "Log all invocations with identities; integrate with SIEM; detect anomalies",
+        "NSA-PATCH": "Track and patch MCP vulnerabilities; maintain inventory of deployed tools",
+        "NSA-SCAN": "Scan networks for unauthorised or vulnerable MCP servers"
+      }
+    },
+    {
+      "id": "FVEY-AGENTIC",
+      "title": "Careful adoption of agentic AI services",
+      "publisher": "ASD ACSC, CISA, NSA, Cyber Centre, NCSC-NZ, NCSC-UK",
+      "version": "2026",
+      "url": "https://www.cyber.gov.au/sites/default/files/2026-05/careful_adoption_of_agentic_ai_services.pdf",
+      "verified": "2026-11-12",
+      "clauses": {
+        "FVEY-IDENTITY": "Distinct cryptographic identity per agent; trusted registry; least-privilege roles",
+        "FVEY-DEFENCE-IN-DEPTH": "Overlapping controls; secure every input and output point",
+        "FVEY-THIRD-PARTY": "Trusted current components; approved tool allow list; SBOMs; separation of duties",
+        "FVEY-REDTEAM": "Adversarial testing, sandboxes, red teaming",
+        "FVEY-RESILIENCE": "Fail-safe defaults, data loss prevention, rollback",
+        "FVEY-ACCOUNTABILITY": "Log artefacts and inter-agent exchanges",
+        "FVEY-SECURE-DEFAULT": "Fail safe; escalate to humans when uncertain; degrade gracefully",
+        "FVEY-ISOLATION": "Segment agents; separate high-risk agents; restrict log write access",
+        "FVEY-MONITORING": "Monitor all operations; detect drift; human and automated review",
+        "FVEY-HITL": "Require human approval for high-impact actions",
+        "FVEY-PRIVILEGES": "Least privilege; short-lived credentials; signing and attestation; runtime policy checks",
+        "FVEY-RATE": "Rate-limit resource use"
+      }
+    },
+    {
+      "id": "DCC",
+      "title": "Defence Cyber Certification",
+      "publisher": "IASME, accepted by MOD under ISN 2026/02",
+      "version": "FAQ as at 2026-11-12",
+      "url": "https://iasme.co.uk/defence-cyber-certification/frequently-asked-questions/",
+      "verified": "2026-11-12",
+      "clauses": {
+        "DCC-L0": "Very low assessed cyber risk; Cyber Essentials; assessor-led",
+        "DCC-L1": "Low to moderate assessed cyber risk; Cyber Essentials; assessor-led",
+        "DCC-L2": "High assessed cyber risk; Cyber Essentials Plus; assessor-led",
+        "DCC-L3": "Substantial assessed cyber risk; Cyber Essentials Plus; assessor-led"
+      }
+    },
+    {
+      "id": "MCP-SPEC",
+      "title": "Model Context Protocol specification, revision 2026-07-28",
+      "publisher": "Agentic AI Foundation (Linux Foundation)",
+      "version": "2026-07-28",
+      "url": "https://modelcontextprotocol.io/specification/2026-07-28/changelog",
+      "verified": "not verified",
+      "note": "Not opened from this repository's sessions: the site was unreachable. Clause text is taken from the design review, which opened the changelog on 12 November 2026. Verify before relying on it.",
+      "clauses": {
+        "MCP-REV-2026-07-28": "Current protocol revision: stateless operation; server/discover replaces the initialize handshake; new result types and tool-list fields"
+      }
+    },
+    {
+      "id": "INNOVOX",
+      "title": "Innovox Assured scheme rules",
+      "publisher": "Innovox",
+      "version": "v0.1",
+      "url": "docs/architecture/solution-architecture.md",
+      "verified": "2026-11-12",
+      "clauses": {
+        "INV-CLAIM": "Public claim restricted to the scheme wording (SAD §1.4)",
+        "INV-TIERS": "Tier rules T1/T2/T3 (SAD §4.4)",
+        "INV-PLATFORM": "Innovox Assured components are held to the scheme they apply"
+      }
+    }
+  ]
+}

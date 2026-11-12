@@ -2,6 +2,7 @@
 //
 //	Dir/certs/*.json        certificate envelopes
 //	Dir/delegations/*.json  root-signed signer delegations
+//	Dir/key-revocations/*.json  root-signed signer-key revocations (optional)
 //	Dir/revocations.json    []feed.Revocation (optional)
 //	Dir/seq                 last published sequence number
 //	Dir/feed.json           output
@@ -41,6 +42,10 @@ func (p Publisher) Publish() (attest.Envelope, error) {
 	if err != nil {
 		return attest.Envelope{}, err
 	}
+	keyRevs, err := readEnvelopes(filepath.Join(p.Dir, "key-revocations"))
+	if err != nil {
+		return attest.Envelope{}, err
+	}
 	var revs []feed.Revocation
 	if b, err := os.ReadFile(filepath.Join(p.Dir, "revocations.json")); err == nil {
 		if err := json.Unmarshal(b, &revs); err != nil {
@@ -67,7 +72,7 @@ func (p Publisher) Publish() (attest.Envelope, error) {
 		return attest.Envelope{}, err
 	}
 	seq++
-	env, err := feed.Sign(feed.Index{Seq: seq, CreatedAt: p.Now().UTC(), Delegations: dels, Certificates: certs, Revocations: revs}, p.KeyID, p.Priv)
+	env, err := feed.Sign(feed.Index{Seq: seq, CreatedAt: p.Now().UTC(), Delegations: dels, Certificates: certs, Revocations: revs, KeyRevocations: keyRevs}, p.KeyID, p.Priv)
 	if err != nil {
 		return attest.Envelope{}, err
 	}

@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"innovox.uk/assured/internal/conformance"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,7 @@ func TestSignVerifyRoundTrip(t *testing.T) {
 }
 
 func TestVerifyRejectsTamperedPayload(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	pub, priv := key(t)
 	env := SignEnvelope("text/plain", []byte("hi"), "k1", priv)
 	env.Payload = []byte("ho")
@@ -44,6 +46,7 @@ func TestVerifyRejectsTamperedPayload(t *testing.T) {
 }
 
 func TestVerifyRejectsUnknownKey(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	_, priv := key(t)
 	other, _ := key(t)
 	env := SignEnvelope("text/plain", []byte("hi"), "k1", priv)
@@ -74,6 +77,7 @@ func TestOpenCertificateRoundTrip(t *testing.T) {
 }
 
 func TestOpenCertificateRejectsWrongPredicateType(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-01")
 	pub, priv := key(t)
 	st := Statement{Type: StatementType, PredicateType: "https://evil.example/v1", Predicate: cert()}
 	raw, _ := json.Marshal(st)
@@ -84,6 +88,7 @@ func TestOpenCertificateRejectsWrongPredicateType(t *testing.T) {
 }
 
 func TestClaimText(t *testing.T) {
+	conformance.Covers(t, "IAS-GOV-01")
 	c := cert().Claim()
 	if !strings.Contains(c, "Innovox Assured scheme v0.1") || strings.Contains(strings.ToLower(c), "certified") {
 		t.Fatalf("bad claim: %q", c)

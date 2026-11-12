@@ -1,0 +1,96 @@
+{
+  "subject": "Innovox Assured platform (this repository)",
+  "assessed": "2026-11-12",
+  "assessor": "Self-assessment by the build team. Not independent.",
+  "assessments": [
+    {
+      "control": "IAS-GOV-03",
+      "status": "not-met",
+      "rationale": "Assessor Console and the separation-of-duties rule are not built; no assessment process is operating yet.",
+      "planned": "Plan 4"
+    },
+    {
+      "control": "IAS-RT-08",
+      "status": "partial",
+      "rationale": "The caller's credentials are never forwarded upstream (adversarial corpus), but token exchange to scoped downstream tokens is not implemented.",
+      "planned": "Plan 7"
+    },
+    {
+      "control": "IAS-RT-09",
+      "status": "met",
+      "rationale": "Outputs are size-limited and every string is scanned for injection phrasing, hidden characters, private keys and configured classification markings, then blocked or flagged per policy. Residual risk: the scan is pattern-based, so paraphrased or encoded injections pass (recorded as known gaps in the adversarial corpus). A classifier-based inspector is planned.",
+      "planned": "Plan 7"
+    },
+    {
+      "control": "IAS-RT-10",
+      "status": "not-met",
+      "rationale": "No human-approval hold for high-impact tools.",
+      "planned": "Plan 7"
+    },
+    {
+      "control": "IAS-ISO-01",
+      "status": "not-met",
+      "rationale": "No runtime controller; services are not yet deployed into a sandbox by the platform.",
+      "planned": "Plan 5"
+    },
+    {
+      "control": "IAS-ISO-02",
+      "status": "partial",
+      "rationale": "The gateway denies a digest mismatch (tested), but the running digest comes from configuration rather than being attested by the runtime.",
+      "planned": "Plan 5"
+    },
+    {
+      "control": "IAS-AUD-03",
+      "status": "met",
+      "rationale": "Every event and signed checkpoint is written to an export sink as JSON lines, and a checkpoint held off the node detects truncation and rewritten history. The gateway writes the export to a file for the customer's log forwarder; a direct SIEM transport is deployment-specific."
+    },
+    {
+      "control": "IAS-VULN-01",
+      "status": "not-met",
+      "rationale": "No vulnerability watcher.",
+      "planned": "Plan 4"
+    },
+    {
+      "control": "IAS-INV-01",
+      "status": "partial",
+      "rationale": "Node state records every accepted certified version (tested), but there is no inventory API or link to what is actually running.",
+      "planned": "Plan 2"
+    },
+    {
+      "control": "IAS-PLAT-01",
+      "status": "partial",
+      "rationale": "This report measures the platform controls. The service controls cannot yet be run against Innovox's own images because the pipeline is not built. The code has no third-party dependencies, so its SBOM is the Go standard library only.",
+      "evidence": "go.mod declares no requirements",
+      "planned": "Plan 3"
+    },
+    {
+      "control": "IAS-PLAT-02",
+      "status": "partial",
+      "rationale": "Work is test-first, vetted and traceable to plans, and was independently reviewed by an AI reviewer with findings fixed test-first. Human code review has not yet taken place.",
+      "evidence": "docs/superpowers/plans; PR #1 description and review findings"
+    },
+    {
+      "control": "IAS-TRUST-09",
+      "status": "not-met",
+      "rationale": "One signer key signs both certificates and feeds, the root is a single key, and there is no root rotation (design review C1, T1).",
+      "planned": "Plan 1b part B"
+    },
+    {
+      "control": "IAS-RT-14",
+      "status": "not-met",
+      "rationale": "The gateway implements the MCP revision before 2026-07-28: it handles initialize and ping and denies server/discover (design review C3, T5).",
+      "planned": "Plan 1b part A"
+    },
+    {
+      "control": "IAS-RT-15",
+      "status": "not-met",
+      "rationale": "The gateway serves plain HTTP with static bearer tokens and calls services over HTTP. Server timeouts are set (design review C7).",
+      "planned": "Plan 1b part C"
+    },
+    {
+      "control": "IAS-TRUST-08",
+      "status": "met",
+      "rationale": "Listings are rebuilt from the signed feed on every load. Residual risk: swapping the whole state file for an older valid one is not detected; that needs a counter held outside the file."
+    }
+  ]
+}

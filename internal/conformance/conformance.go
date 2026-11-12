@@ -1,0 +1,320 @@
+// Package conformance links tests to Innovox Assured controls and builds a
+// conformance report from `go test -json` output plus a written assessment.
+//
+// A test declares what it proves with Covers(t, "IAS-RT-02"). The report
+// only counts an automated control as met when tagged tests ran and passed:
+// a written "met" claim without test evidence is rejected.
+package conformance
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+	"testing"
+
+	"innovox.uk/assured/scheme"
+)
+
+const marker = "innovox-control: "
+
+// Covers records that the calling test is evidence for the given controls.
+func Covers(t testing.TB, ids ...string) {
+	t.Helper()
+	for _, id := range ids {
+		t.Logf("%s%s", marker, id)
+	}
+}
+
+// TestResult is one test's outcome.
+type TestResult struct {
+	Name   string
+	Passed bool
+}
+
+// Evidence maps control IDs to the tests that claim to prove them.
+type Evidence map[string][]TestResult
+
+var markerRe = regexp.MustCompile(regexp.QuoteMeta(marker) + `(IAS-[A-Z0-9]+-[0-9]+)`)
+
+type event struct {
+	Action  string
+	Package string
+	Test    string
+	Output  string
+}
+
+// ParseEvents reads `go test -json` output.
+func ParseEvents(r io.Reader) (Evidence, error) {
+	claims := map[string][]string{} // test -> controls
+	result := map[string]bool{}
+	var order []string
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 1<<20), 1<<20)
+	for sc.Scan() {
+		var e event
+		if err := json.Unmarshal(sc.Bytes(), &e); err != nil || e.Test == "" {
+			continue // non-JSON build output and package-level lines carry no evidence
+		}
+		name := e.Package + "." + e.Test
+		switch e.Action {
+		case "output":
+			for _, m := range markerRe.FindAllStringSubmatch(e.Output, -1) {
+				if _, ok := claims[name]; !ok {
+					order = append(order, name)
+				}
+				if !slices.Contains(claims[name], m[1]) {
+					claims[name] = append(claims[name], m[1])
+				}
+			}
+		case "pass":
+			result[name] = true
+		case "fail":
+			result[name] = false
+		}
+	}
+	ev := Evidence{}
+	for _, name := range order {
+		for _, id := range claims[name] {
+			ev[id] = append(ev[id], TestResult{Name: name, Passed: result[name]})
+		}
+	}
+	// Packages run in parallel, so sort for a stable, diff-friendly report.
+	for id := range ev {
+		sort.Slice(ev[id], func(i, j int) bool { return ev[id][i].Name < ev[id][j].Name })
+	}
+	return ev, sc.Err()
+}
+
+// Assessment is a written judgement for a control, kept in
+// scheme/self-assessment.json.
+type Assessment struct {
+	Control   string `json:"control"`
+	Status    string `json:"status"` // met | partial | not-met | not-yet-testable | not-applicable
+	Rationale string `json:"rationale"`
+	Evidence  string `json:"evidence,omitempty"`
+	Planned   string `json:"planned,omitempty"`
+}
+
+var statuses = []string{"met", "partial", "not-met", "not-yet-testable", "not-applicable"}
+
+// Row is one control's result.
+type Row struct {
+	Control    scheme.Control
+	Status     string
+	Tests      []TestResult
+	Assessment *Assessment
+}
+
+type Report struct {
+	Scheme   *scheme.Scheme
+	Rows     []Row
+	Problems []string
+}
+
+// Build combines test evidence and written assessments into a report.
+func Build(s *scheme.Scheme, ev Evidence, assessments []Assessment) *Report {
+	r := &Report{Scheme: s}
+	byID := map[string]*Assessment{}
+	for i := range assessments {
+		a := &assessments[i]
+		if _, ok := s.Control(a.Control); !ok {
+			r.Problems = append(r.Problems, fmt.Sprintf("assessment for unknown control %s", a.Control))
+			continue
+		}
+		if !slices.Contains(statuses, a.Status) {
+			r.Problems = append(r.Problems, fmt.Sprintf("%s: unknown status %q", a.Control, a.Status))
+		}
+		byID[a.Control] = a
+	}
+	for id := range ev {
+		if _, ok := s.Control(id); !ok {
+			r.Problems = append(r.Problems, fmt.Sprintf("tests cite unknown control %s", id))
+		}
+	}
+	for _, c := range s.Controls {
+		row := Row{Control: c, Tests: ev[c.ID], Assessment: byID[c.ID]}
+		row.Status = r.status(row)
+		r.Rows = append(r.Rows, row)
+	}
+	sort.Strings(r.Problems)
+	return r
+}
+
+func (r *Report) status(row Row) string {
+	c, a := row.Control, row.Assessment
+	failing := slices.ContainsFunc(row.Tests, func(t TestResult) bool { return !t.Passed })
+	if failing {
+		return "failing"
+	}
+	switch c.Method {
+	case "automated":
+		if a == nil {
+			if len(row.Tests) > 0 {
+				return "met"
+			}
+			return "not-met"
+		}
+		if a.Status == "met" && len(row.Tests) == 0 {
+			r.Problems = append(r.Problems, fmt.Sprintf("%s: assessed met but no passing test evidence", c.ID))
+			return "not-met"
+		}
+		return a.Status
+	default:
+		if a == nil {
+			return "not-yet-testable"
+		}
+		if a.Status == "met" && strings.TrimSpace(a.Evidence) == "" {
+			r.Problems = append(r.Problems, fmt.Sprintf("%s: assessed met without evidence reference", c.ID))
+			return "partial"
+		}
+		return a.Status
+	}
+}
+
+// Status returns the computed status for a control.
+func (r *Report) Status(id string) string {
+	for _, row := range r.Rows {
+		if row.Control.ID == id {
+			return row.Status
+		}
+	}
+	return ""
+}
+
+// Markdown renders the report.
+func (r *Report) Markdown() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Innovox Assured %s: conformance report\n\n", r.Scheme.Version)
+	b.WriteString("Generated by `go run ./cmd/innovox-conformance`. Automated controls are marked met only when tagged tests ran and passed.\n\n")
+	order := []string{"met", "partial", "failing", "not-met", "not-yet-testable", "not-applicable"}
+	count := map[string]int{}
+	for _, row := range r.Rows {
+		count[row.Status]++
+	}
+	b.WriteString("## Summary\n\n| Status | Controls |\n|---|---|\n")
+	for _, st := range order {
+		if count[st] > 0 {
+			fmt.Fprintf(&b, "| %s | %d |\n", st, count[st])
+		}
+	}
+	if len(r.Problems) > 0 {
+		b.WriteString("\n## Problems\n\n")
+		for _, p := range r.Problems {
+			fmt.Fprintf(&b, "- %s\n", p)
+		}
+	}
+	for _, scope := range []string{"platform", "service"} {
+		title := map[string]string{"platform": "Platform controls (Innovox Assured itself)", "service": "Service controls (measured by the certification pipeline)"}[scope]
+		fmt.Fprintf(&b, "\n## %s\n\n| Control | Title | Method | Status | Evidence |\n|---|---|---|---|---|\n", title)
+		for _, row := range r.Rows {
+			if row.Control.Scope != scope {
+				continue
+			}
+			fmt.Fprintf(&b, "| %s | %s | %s | **%s** | %s |\n", row.Control.ID, row.Control.Title, method(row.Control), row.Status, evidenceCell(row))
+		}
+	}
+	r.standards(&b)
+	return b.String()
+}
+
+// standards lists every verified clause of every source with the controls
+// that map to it and their status, so gaps against each standard are visible.
+func (r *Report) standards(b *strings.Builder) {
+	if len(r.Scheme.Sources) == 0 {
+		return
+	}
+	b.WriteString("\n## Coverage by standard\n\nEach clause lists the controls that map to it and their current status. A dash means no control covers the clause.\n")
+	for _, src := range r.Scheme.Sources {
+		fmt.Fprintf(b, "\n### %s\n\n", src.Title)
+		if src.Version != "" || src.URL != "" {
+			fmt.Fprintf(b, "%s · [source](%s) · verified %s\n\n", src.Version, src.URL, src.Verified)
+		}
+		if src.Note != "" {
+			fmt.Fprintf(b, "> %s\n\n", src.Note)
+		}
+		b.WriteString("| Clause | Text | Controls |\n|---|---|---|\n")
+		ids := make([]string, 0, len(src.Clauses))
+		for id := range src.Clauses {
+			ids = append(ids, id)
+		}
+		sort.Slice(ids, func(i, j int) bool { return naturalLess(ids[i], ids[j]) })
+		for _, id := range ids {
+			var cs []string
+			for _, row := range r.Rows {
+				if slices.Contains(row.Control.MapsTo, id) {
+					cs = append(cs, fmt.Sprintf("%s (%s)", row.Control.ID, row.Status))
+				}
+			}
+			cell := "—"
+			if len(cs) > 0 {
+				cell = strings.Join(cs, ", ")
+			}
+			fmt.Fprintf(b, "| %s | %s | %s |\n", id, strings.ReplaceAll(src.Clauses[id], "|", "\\|"), cell)
+		}
+	}
+}
+
+// naturalLess orders "P2" before "P10" by comparing digit runs numerically.
+func naturalLess(a, b string) bool {
+	for a != "" && b != "" {
+		da, ra := leadingDigits(a)
+		db, rb := leadingDigits(b)
+		if da != "" && db != "" {
+			if len(da) != len(db) {
+				return len(da) < len(db)
+			}
+			if da != db {
+				return da < db
+			}
+			a, b = ra, rb
+			continue
+		}
+		if a[0] != b[0] {
+			return a[0] < b[0]
+		}
+		a, b = a[1:], b[1:]
+	}
+	return len(a) < len(b)
+}
+
+func leadingDigits(s string) (string, string) {
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	return s[:i], s[i:]
+}
+
+func method(c scheme.Control) string {
+	if c.Stage != "" {
+		return c.Method + " " + c.Stage
+	}
+	return c.Method
+}
+
+func evidenceCell(row Row) string {
+	var parts []string
+	for _, t := range row.Tests {
+		mark := "✓"
+		if !t.Passed {
+			mark = "✗"
+		}
+		parts = append(parts, fmt.Sprintf("%s `%s`", mark, t.Name))
+	}
+	if a := row.Assessment; a != nil {
+		s := a.Rationale
+		if a.Evidence != "" {
+			s += " Evidence: " + a.Evidence + "."
+		}
+		if a.Planned != "" {
+			s += " Planned: " + a.Planned + "."
+		}
+		parts = append(parts, s)
+	}
+	return strings.ReplaceAll(strings.Join(parts, "<br>"), "|", "\\|")
+}
