@@ -3,19 +3,90 @@
   "assessed": "2026-11-12",
   "assessor": "Self-assessment by the build team. Not independent.",
   "assessments": [
-    {"control": "IAS-GOV-03", "status": "not-met", "rationale": "Assessor Console and the separation-of-duties rule are not built; no assessment process is operating yet.", "planned": "Plan 4"},
-    {"control": "IAS-TRUST-03", "status": "not-met", "rationale": "No root-signed revocation of signer keys; a stolen signer key stays valid until its delegation expires (review finding I6).", "planned": "Plan 4"},
-    {"control": "IAS-RT-08", "status": "partial", "rationale": "The caller's credentials are never forwarded upstream (tested), but token exchange to scoped downstream tokens is not implemented.", "planned": "Plan 7"},
-    {"control": "IAS-RT-09", "status": "partial", "rationale": "Upstream responses are bounded to 4 MiB (tested); no injection or data-loss inspection yet.", "planned": "Plan 7"},
-    {"control": "IAS-RT-10", "status": "not-met", "rationale": "No human-approval hold for high-impact tools.", "planned": "Plan 7"},
-    {"control": "IAS-RT-11", "status": "not-met", "rationale": "No kill switch.", "planned": "Plan 2"},
-    {"control": "IAS-RT-12", "status": "partial", "rationale": "Request bodies are bounded to 4 MiB (tested); no per-principal or per-service rate limits.", "planned": "Plan 2"},
-    {"control": "IAS-ISO-01", "status": "not-met", "rationale": "No runtime controller; services are not yet deployed into a sandbox by the platform.", "planned": "Plan 5"},
-    {"control": "IAS-ISO-02", "status": "partial", "rationale": "The gateway denies a digest mismatch (tested), but the running digest comes from configuration rather than being attested by the runtime.", "planned": "Plan 5"},
-    {"control": "IAS-AUD-03", "status": "not-met", "rationale": "No SIEM export and no signed checkpoints; tail truncation of the audit log is undetectable (review finding M4).", "planned": "Plan 2"},
-    {"control": "IAS-VULN-01", "status": "not-met", "rationale": "No vulnerability watcher.", "planned": "Plan 4"},
-    {"control": "IAS-INV-01", "status": "partial", "rationale": "Node state records every accepted certified version (tested), but there is no inventory API or link to what is actually running.", "planned": "Plan 2"},
-    {"control": "IAS-PLAT-01", "status": "partial", "rationale": "This report measures the platform controls. The service controls cannot yet be run against Innovox's own images because the pipeline is not built. The code has no third-party dependencies, so its SBOM is the Go standard library only.", "evidence": "go.mod declares no requirements", "planned": "Plan 3"},
-    {"control": "IAS-PLAT-02", "status": "partial", "rationale": "Work is test-first, vetted and traceable to plans, and was independently reviewed by an AI reviewer with findings fixed test-first. Human code review has not yet taken place.", "evidence": "docs/superpowers/plans; PR #1 description and review findings"}
+    {
+      "control": "IAS-GOV-03",
+      "status": "not-met",
+      "rationale": "Assessor Console and the separation-of-duties rule are not built; no assessment process is operating yet.",
+      "planned": "Plan 4"
+    },
+    {
+      "control": "IAS-TRUST-03",
+      "status": "not-met",
+      "rationale": "No root-signed revocation of signer keys; a stolen signer key stays valid until its delegation expires (review finding I6).",
+      "planned": "Plan 4"
+    },
+    {
+      "control": "IAS-RT-08",
+      "status": "partial",
+      "rationale": "The caller's credentials are never forwarded upstream (adversarial corpus), but token exchange to scoped downstream tokens is not implemented.",
+      "planned": "Plan 7"
+    },
+    {
+      "control": "IAS-RT-09",
+      "status": "partial",
+      "rationale": "Upstream responses are bounded to 4 MiB and event-stream responses are refused (adversarial corpus). Injection text inside tool output still reaches the agent (corpus known gap).",
+      "planned": "Plan 7"
+    },
+    {
+      "control": "IAS-RT-10",
+      "status": "not-met",
+      "rationale": "No human-approval hold for high-impact tools.",
+      "planned": "Plan 7"
+    },
+    {
+      "control": "IAS-RT-11",
+      "status": "not-met",
+      "rationale": "No kill switch.",
+      "planned": "Plan 2"
+    },
+    {
+      "control": "IAS-RT-12",
+      "status": "partial",
+      "rationale": "Request bodies are bounded to 4 MiB (adversarial corpus). There are no per-principal or per-service rate limits: 200 rapid calls all reach the service (corpus known gap).",
+      "planned": "Plan 2"
+    },
+    {
+      "control": "IAS-ISO-01",
+      "status": "not-met",
+      "rationale": "No runtime controller; services are not yet deployed into a sandbox by the platform.",
+      "planned": "Plan 5"
+    },
+    {
+      "control": "IAS-ISO-02",
+      "status": "partial",
+      "rationale": "The gateway denies a digest mismatch (tested), but the running digest comes from configuration rather than being attested by the runtime.",
+      "planned": "Plan 5"
+    },
+    {
+      "control": "IAS-AUD-03",
+      "status": "not-met",
+      "rationale": "No SIEM export and no signed checkpoints; tail truncation of the audit log is undetectable (review finding M4).",
+      "planned": "Plan 2"
+    },
+    {
+      "control": "IAS-VULN-01",
+      "status": "not-met",
+      "rationale": "No vulnerability watcher.",
+      "planned": "Plan 4"
+    },
+    {
+      "control": "IAS-INV-01",
+      "status": "partial",
+      "rationale": "Node state records every accepted certified version (tested), but there is no inventory API or link to what is actually running.",
+      "planned": "Plan 2"
+    },
+    {
+      "control": "IAS-PLAT-01",
+      "status": "partial",
+      "rationale": "This report measures the platform controls. The service controls cannot yet be run against Innovox's own images because the pipeline is not built. The code has no third-party dependencies, so its SBOM is the Go standard library only.",
+      "evidence": "go.mod declares no requirements",
+      "planned": "Plan 3"
+    },
+    {
+      "control": "IAS-PLAT-02",
+      "status": "partial",
+      "rationale": "Work is test-first, vetted and traceable to plans, and was independently reviewed by an AI reviewer with findings fixed test-first. Human code review has not yet taken place.",
+      "evidence": "docs/superpowers/plans; PR #1 description and review findings"
+    }
   ]
 }

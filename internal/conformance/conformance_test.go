@@ -84,3 +84,16 @@ func TestRenderSummarisesAndListsEvidence(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderStandardsCoverage(t *testing.T) {
+	s := sch()
+	s.Sources = []scheme.Source{{ID: "OWASP-MCP", Title: "OWASP MCP Top 10", Clauses: map[string]string{"MCP03": "Tool Poisoning", "MCP08": "Lack of Audit and Telemetry"}}}
+	s.Controls[0].MapsTo = []string{"MCP03"}
+	ev, _ := ParseEvents(strings.NewReader(events))
+	md := Build(s, ev, nil).Markdown()
+	for _, want := range []string{"## Coverage by standard", "### OWASP MCP Top 10", "| MCP03 | Tool Poisoning | IAS-RT-02 (met) |", "| MCP08 | Lack of Audit and Telemetry | — |"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in:\n%s", want, md)
+		}
+	}
+}

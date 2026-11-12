@@ -56,7 +56,11 @@ func Call(c *http.Client, url string, req Request) (Response, error) {
 	}
 	hr.Header.Set("Content-Type", "application/json")
 	hr.Header.Set("Accept", "application/json")
-	resp, err := c.Do(hr)
+	// Never follow redirects: a server could otherwise steer the gateway to
+	// an internal endpoint (SSRF). A redirect response is not JSON and fails.
+	noRedirect := *c
+	noRedirect.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := noRedirect.Do(hr)
 	if err != nil {
 		return Response{}, err
 	}

@@ -214,7 +214,76 @@ func (r *Report) Markdown() string {
 			fmt.Fprintf(&b, "| %s | %s | %s | **%s** | %s |\n", row.Control.ID, row.Control.Title, method(row.Control), row.Status, evidenceCell(row))
 		}
 	}
+	r.standards(&b)
 	return b.String()
+}
+
+// standards lists every verified clause of every source with the controls
+// that map to it and their status, so gaps against each standard are visible.
+func (r *Report) standards(b *strings.Builder) {
+	if len(r.Scheme.Sources) == 0 {
+		return
+	}
+	b.WriteString("\n## Coverage by standard\n\nEach clause lists the controls that map to it and their current status. A dash means no control covers the clause.\n")
+	for _, src := range r.Scheme.Sources {
+		fmt.Fprintf(b, "\n### %s\n\n", src.Title)
+		if src.Version != "" || src.URL != "" {
+			fmt.Fprintf(b, "%s · [source](%s) · verified %s\n\n", src.Version, src.URL, src.Verified)
+		}
+		if src.Note != "" {
+			fmt.Fprintf(b, "> %s\n\n", src.Note)
+		}
+		b.WriteString("| Clause | Text | Controls |\n|---|---|---|\n")
+		ids := make([]string, 0, len(src.Clauses))
+		for id := range src.Clauses {
+			ids = append(ids, id)
+		}
+		sort.Slice(ids, func(i, j int) bool { return naturalLess(ids[i], ids[j]) })
+		for _, id := range ids {
+			var cs []string
+			for _, row := range r.Rows {
+				if slices.Contains(row.Control.MapsTo, id) {
+					cs = append(cs, fmt.Sprintf("%s (%s)", row.Control.ID, row.Status))
+				}
+			}
+			cell := "—"
+			if len(cs) > 0 {
+				cell = strings.Join(cs, ", ")
+			}
+			fmt.Fprintf(b, "| %s | %s | %s |\n", id, strings.ReplaceAll(src.Clauses[id], "|", "\\|"), cell)
+		}
+	}
+}
+
+// naturalLess orders "P2" before "P10" by comparing digit runs numerically.
+func naturalLess(a, b string) bool {
+	for a != "" && b != "" {
+		da, ra := leadingDigits(a)
+		db, rb := leadingDigits(b)
+		if da != "" && db != "" {
+			if len(da) != len(db) {
+				return len(da) < len(db)
+			}
+			if da != db {
+				return da < db
+			}
+			a, b = ra, rb
+			continue
+		}
+		if a[0] != b[0] {
+			return a[0] < b[0]
+		}
+		a, b = a[1:], b[1:]
+	}
+	return len(a) < len(b)
+}
+
+func leadingDigits(s string) (string, string) {
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	return s[:i], s[i:]
 }
 
 func method(c scheme.Control) string {

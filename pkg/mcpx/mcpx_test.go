@@ -2,6 +2,7 @@ package mcpx
 
 import (
 	"encoding/json"
+	"innovox.uk/assured/internal/conformance"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,5 +36,19 @@ func TestCallRejectsNonJSON(t *testing.T) {
 	defer srv.Close()
 	if _, err := Call(srv.Client(), srv.URL, Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/list"}); err == nil {
 		t.Fatal("SSE response accepted")
+	}
+}
+
+func TestCallDoesNotFollowRedirects(t *testing.T) {
+	conformance.Covers(t, "IAS-RT-01")
+	hit := false
+	inner := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hit = true }))
+	defer inner.Close()
+	outer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, inner.URL, http.StatusTemporaryRedirect)
+	}))
+	defer outer.Close()
+	if _, err := Call(outer.Client(), outer.URL, Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "ping"}); err == nil || hit {
+		t.Fatalf("redirect followed: err=%v hit=%v", err, hit)
 	}
 }
