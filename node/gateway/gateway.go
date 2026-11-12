@@ -35,20 +35,32 @@ type Gateway struct {
 	Grace     time.Duration
 	Now       func() time.Time
 	Client    *http.Client
+
+	// Optional controls. A nil value disables that control.
+	Kill           *Kill           // operator kill switch
+	Admins         map[string]bool // principals allowed to operate the kill switch
+	PrincipalLimit *Limiter        // rate limit per caller
+	ServiceLimit   *Limiter        // rate limit per service, across callers
+	Inspect        Inspector       // tool-output inspection
 }
 
 type decision struct {
 	code   int
 	action string
 	detail string
+	cause  string // audited, never returned to the caller
 }
 
 func deny(action, format string, a ...any) *decision {
 	return &decision{code: http.StatusForbidden, action: action, detail: fmt.Sprintf(format, a...)}
 }
 
-// ServeHTTP handles POST /mcp/{name}@{version}.
+// ServeHTTP handles POST /mcp/{name}@{version} and POST /admin/kill.
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost && r.URL.Path == "/admin/kill" {
+		g.serveKill(w, r)
+		return
+	}
 	service, ok := strings.CutPrefix(r.URL.Path, "/mcp/")
 	if r.Method != http.MethodPost || !ok || service == "" {
 		http.NotFound(w, r)
@@ -59,6 +71,19 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	principal, authErr := g.Auth.Authenticate(r)
 	if authErr != nil {
 		g.write(w, "anonymous", service, mcpx.Request{}, &decision{code: http.StatusUnauthorized, action: "authenticate", detail: "invalid credentials"}, nil)
+		return
+	}
+	// Kill switch and rate limits also run before the body is read.
+	if g.Kill != nil {
+		if why, blocked := g.Kill.Blocked(principal, service); blocked {
+			g.write(w, principal, service, mcpx.Request{}, deny("kill_switch", "%s", why), nil)
+			return
+		}
+	}
+	_, known := g.Upstreams[service] // unknown services are denied later and must not grow the limiter
+	if (g.PrincipalLimit != nil && !g.PrincipalLimit.Allow(principal)) ||
+		(g.ServiceLimit != nil && known && !g.ServiceLimit.Allow(service)) {
+		g.write(w, principal, service, mcpx.Request{}, &decision{code: http.StatusTooManyRequests, action: "rate_limited", detail: "rate limit exceeded"}, nil)
 		return
 	}
 	var req mcpx.Request
@@ -134,7 +159,21 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 		if !g.Policy.Allow(principal, service, p.Name) {
 			return nil, deny("policy", "principal not granted tool %q", p.Name)
 		}
-		return g.forward(principal, service, up, req)
+		resp, d := g.forward(principal, service, up, req)
+		if d != nil || g.Inspect == nil {
+			return resp, d
+		}
+		// The call has already run upstream; inspection decides whether its
+		// output may reach the agent. The matched text is never echoed back.
+		raw, _ := json.Marshal(resp)
+		if rule, block := g.Inspect.Inspect(service, p.Name, raw); block {
+			return nil, deny("output_blocked", "tool output broke rule %s", rule)
+		} else if rule != "" {
+			if _, err := g.Audit.Append(principal, "output_flagged", "allow", clip(service+" "+p.Name+" rule "+rule, 512)); err != nil {
+				return nil, &decision{code: http.StatusServiceUnavailable, action: "audit", detail: "audit unavailable"}
+			}
+		}
+		return resp, nil
 
 	case req.Method == "initialize":
 		resp, d := g.forward(principal, service, up, req)
@@ -153,8 +192,15 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 // certified manifest hash. Paginated lists are refused, never hashed partially.
 func (g *Gateway) verifiedTools(up Upstream, want string, id json.RawMessage) ([]manifest.Tool, *decision) {
 	resp, err := mcpx.Call(g.Client, up.URL, mcpx.Request{JSONRPC: "2.0", ID: id, Method: "tools/list"})
-	if err != nil || resp.Error != nil {
-		return nil, deny("upstream", "tools/list failed")
+	if err != nil {
+		d := deny("upstream", "tools/list failed")
+		d.cause = err.Error()
+		return nil, d
+	}
+	if resp.Error != nil {
+		d := deny("upstream", "tools/list failed")
+		d.cause = resp.Error.Message
+		return nil, d
 	}
 	var tl mcpx.ToolsListResult
 	if err := json.Unmarshal(resp.Result, &tl); err != nil {
@@ -178,9 +224,57 @@ func (g *Gateway) forward(principal, service string, up Upstream, req mcpx.Reque
 	}
 	resp, err := mcpx.Call(g.Client, up.URL, req)
 	if err != nil {
-		return nil, deny("upstream", "upstream call failed")
+		d := deny("upstream", "upstream call failed")
+		d.cause = err.Error()
+		return nil, d
 	}
 	return &resp, nil
+}
+
+// serveKill lets an admin engage or release the kill switch.
+// Body: {"scope":"all|service|principal","target":"...","engaged":true}.
+// Engaging always takes effect, even if it cannot be audited, because
+// stopping traffic is the safe direction. Releasing requires an audit record.
+func (g *Gateway) serveKill(w http.ResponseWriter, r *http.Request) {
+	principal, err := g.Auth.Authenticate(r)
+	if err != nil {
+		g.Audit.Append("anonymous", "kill_switch", "deny", "invalid credentials")
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+		return
+	}
+	if g.Kill == nil || !g.Admins[principal] {
+		g.Audit.Append(clip(principal, 256), "kill_switch", "deny", "not an admin")
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var body struct {
+		Scope   string `json:"scope"`
+		Target  string `json:"target"`
+		Engaged bool   `json:"engaged"`
+	}
+	b, _ := io.ReadAll(io.LimitReader(r.Body, 4<<10))
+	if json.Unmarshal(b, &body) != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	verb := "release"
+	if body.Engaged {
+		verb = "engage"
+	}
+	_, auditErr := g.Audit.Append(clip(principal, 256), "kill_switch", "allow", clip(verb+" "+body.Scope+" "+body.Target, 512))
+	if auditErr != nil && !body.Engaged {
+		http.Error(w, "audit unavailable: kill switch not released", http.StatusServiceUnavailable)
+		return
+	}
+	if err := g.Kill.Set(body.Scope, body.Target, body.Engaged); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if auditErr != nil {
+		http.Error(w, "engaged, but the action could not be audited", http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // strictCallParams accepts only {"name": string, "arguments": object?} with
@@ -252,6 +346,9 @@ func (g *Gateway) write(w http.ResponseWriter, principal, service string, req mc
 	result, detail := "allow", ""
 	if d != nil {
 		result, action, detail = "deny", d.action, d.detail
+		if d.cause != "" {
+			detail += " cause: " + d.cause
+		}
 	}
 	if _, err := g.Audit.Append(clip(principal, 256), clip(action, 128), result, clip(service+" "+req.Method+" "+detail, 1024)); err != nil && d == nil {
 		// Fail closed: an unauditable allow becomes a deny.

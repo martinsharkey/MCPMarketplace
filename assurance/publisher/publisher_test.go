@@ -54,3 +54,32 @@ func TestPublishRejectsUnknownRevocationDigest(t *testing.T) {
 		t.Fatal("revocation for unknown certificate published")
 	}
 }
+
+func TestPublishCarriesKeyRevocations(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-03")
+	now := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
+	rp, rs, _ := ed25519.GenerateKey(rand.Reader)
+	oldPub, _, _ := ed25519.GenerateKey(rand.Reader)
+	sp, ss, _ := ed25519.GenerateKey(rand.Reader)
+	dir := t.TempDir()
+	write := func(sub, name string, v any) {
+		os.MkdirAll(filepath.Join(dir, sub), 0o755)
+		b, _ := json.Marshal(v)
+		os.WriteFile(filepath.Join(dir, sub, name), b, 0o644)
+	}
+	write("delegations", "old.json", trust.Delegate(rs, oldPub, now.AddDate(1, 0, 0)))
+	write("delegations", "new.json", trust.Delegate(rs, sp, now.AddDate(1, 0, 0)))
+	write("key-revocations", "old.json", trust.RevokeKey(rs, trust.KeyID(oldPub), "stolen", now))
+	p := Publisher{Dir: dir, KeyID: trust.KeyID(sp), Priv: ss, Now: func() time.Time { return now }}
+	env, err := p.Publish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	kr := trust.NewKeyring(rp)
+	if _, err := feed.Open(env, kr, now); err != nil {
+		t.Fatal(err)
+	}
+	if got := kr.Revoked(); len(got) != 1 || got[0] != trust.KeyID(oldPub) {
+		t.Fatalf("revocation not carried: %v", got)
+	}
+}

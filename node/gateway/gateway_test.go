@@ -32,6 +32,7 @@ type fakeMCP struct {
 	tools  atomic.Value // []manifest.Tool
 	cursor atomic.Value // string
 	calls  atomic.Int32
+	result atomic.Value // func() json.RawMessage: overrides the tools/call result
 }
 
 func (f *fakeMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +53,9 @@ func (f *fakeMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "tools/call":
 		f.calls.Add(1)
 		result = map[string]any{"content": []map[string]string{{"type": "text", "text": "ok"}}}
+		if fn, ok := f.result.Load().(func() json.RawMessage); ok {
+			result = fn()
+		}
 	default:
 		result = map[string]any{}
 	}

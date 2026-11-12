@@ -8,12 +8,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"innovox.uk/assured/pkg/attest"
 )
 
-const DelegationPayloadType = "application/vnd.innovox.delegation+json"
+const (
+	DelegationPayloadType    = "application/vnd.innovox.delegation+json"
+	KeyRevocationPayloadType = "application/vnd.innovox.keyrevocation+json"
+)
 
 // KeyID is the first 16 hex characters of SHA-256(public key).
 func KeyID(pub ed25519.PublicKey) string {
@@ -38,10 +42,26 @@ func Delegate(rootPriv ed25519.PrivateKey, signerPub ed25519.PublicKey, notAfter
 	return attest.SignEnvelope(DelegationPayloadType, raw, KeyID(rootPub), rootPriv)
 }
 
-// Keyring holds the pinned root key and the delegations it has verified.
+// KeyRevocation withdraws a signer key for good. Only the root can issue one.
+type KeyRevocation struct {
+	KeyID     string    `json:"keyid"`
+	Reason    string    `json:"reason"`
+	RevokedAt time.Time `json:"revokedAt"`
+}
+
+// RevokeKey has the root permanently revoke a signer key.
+func RevokeKey(rootPriv ed25519.PrivateKey, keyID, reason string, at time.Time) attest.Envelope {
+	raw, _ := json.Marshal(KeyRevocation{KeyID: keyID, Reason: reason, RevokedAt: at.UTC()})
+	rootPub := rootPriv.Public().(ed25519.PublicKey)
+	return attest.SignEnvelope(KeyRevocationPayloadType, raw, KeyID(rootPub), rootPriv)
+}
+
+// Keyring holds the pinned root key, the delegations it has verified and
+// the signer keys it has revoked.
 type Keyring struct {
 	root        ed25519.PublicKey
 	delegations []Delegation
+	revoked     map[string]bool
 }
 
 func NewKeyring(rootPub ed25519.PublicKey) *Keyring { return &Keyring{root: rootPub} }
@@ -65,10 +85,49 @@ func (k *Keyring) AddDelegation(env attest.Envelope, now time.Time) error {
 	return nil
 }
 
-// SignerKeys returns delegated keys valid at now. The root is never included.
+// AddKeyRevocation verifies env against the root and revokes the key it names.
+func (k *Keyring) AddKeyRevocation(env attest.Envelope) error {
+	if env.PayloadType != KeyRevocationPayloadType {
+		return fmt.Errorf("trust: payloadType %q", env.PayloadType)
+	}
+	if _, err := attest.VerifyEnvelope(env, map[string]ed25519.PublicKey{KeyID(k.root): k.root}); err != nil {
+		return fmt.Errorf("trust: key revocation not signed by root: %w", err)
+	}
+	var r KeyRevocation
+	if err := json.Unmarshal(env.Payload, &r); err != nil || r.KeyID == "" {
+		return fmt.Errorf("trust: malformed key revocation")
+	}
+	k.Revoke(r.KeyID)
+	return nil
+}
+
+// Revoke marks a key revoked without a signed statement. It is for
+// re-loading revocations the node has already verified and stored.
+func (k *Keyring) Revoke(keyID string) {
+	if k.revoked == nil {
+		k.revoked = map[string]bool{}
+	}
+	k.revoked[keyID] = true
+}
+
+// Revoked returns the revoked key IDs, sorted.
+func (k *Keyring) Revoked() []string {
+	out := make([]string, 0, len(k.revoked))
+	for id := range k.revoked {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// SignerKeys returns delegated keys that are valid at now and not revoked.
+// The root is never included.
 func (k *Keyring) SignerKeys(now time.Time) map[string]ed25519.PublicKey {
 	out := map[string]ed25519.PublicKey{}
 	for _, d := range k.delegations {
+		if k.revoked[d.KeyID] {
+			continue
+		}
 		if !now.Before(d.NotBefore) && now.Before(d.NotAfter) {
 			out[d.KeyID] = ed25519.PublicKey(d.PublicKey)
 		}
