@@ -29,7 +29,7 @@ var digest = "sha256:" + strings.Repeat("c", 64)
 func req(tier string) Request {
 	return Request{Service: attest.ServiceRef{Name: "uk.example/echo", Version: "1.0.0", Kind: "mcp"}, ImageDigest: digest,
 		Tools: []manifest.Tool{{Name: "echo", Description: "Echo", InputSchema: json.RawMessage(`{"type":"object"}`)}},
-		Tier: tier, SchemeVersion: "v0.1"}
+		Tier:  tier, SchemeVersion: "v0.1"}
 }
 
 func open(t *testing.T, s Signer, keys map[string]ed25519.PublicKey, r Request) attest.Statement {
