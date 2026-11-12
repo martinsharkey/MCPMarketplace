@@ -39,3 +39,15 @@ func TestPublishIncrementsSeq(t *testing.T) {
 		}
 	}
 }
+
+func TestPublishRejectsUnknownRevocationDigest(t *testing.T) {
+	now := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
+	_, ss, _ := ed25519.GenerateKey(rand.Reader)
+	dir := t.TempDir()
+	revs, _ := json.Marshal([]feed.Revocation{{CertDigest: "SHA256:ABC", Reason: "typo", RevokedAt: now}})
+	os.WriteFile(filepath.Join(dir, "revocations.json"), revs, 0o644)
+	p := Publisher{Dir: dir, KeyID: "k", Priv: ss, Now: func() time.Time { return now }}
+	if _, err := p.Publish(); err == nil {
+		t.Fatal("revocation for unknown certificate published")
+	}
+}

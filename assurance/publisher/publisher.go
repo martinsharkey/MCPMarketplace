@@ -49,6 +49,15 @@ func (p Publisher) Publish() (attest.Envelope, error) {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return attest.Envelope{}, err
 	}
+	held := map[string]bool{}
+	for _, c := range certs {
+		held[feed.CertDigest(c)] = true
+	}
+	for _, r := range revs {
+		if !held[r.CertDigest] {
+			return attest.Envelope{}, fmt.Errorf("publisher: revocation %q matches no held certificate (want 64 lowercase hex)", r.CertDigest)
+		}
+	}
 	var seq uint64
 	if b, err := os.ReadFile(filepath.Join(p.Dir, "seq")); err == nil {
 		if seq, err = strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64); err != nil {

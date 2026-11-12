@@ -105,3 +105,12 @@ func TestCanonicalizeNumbersES6(t *testing.T) {
 		t.Fatalf("got %s want %s", got, want)
 	}
 }
+
+func TestCanonicalizeRejectsDuplicateKeys(t *testing.T) {
+	if _, err := Canonicalize([]byte(`{"type":"EVIL","type":"object"}`)); err == nil {
+		t.Fatal("duplicate keys accepted")
+	}
+	if _, err := Canonicalize([]byte(`{"a":{"x":1,"x":2}}`)); err == nil {
+		t.Fatal("nested duplicate keys accepted")
+	}
+}

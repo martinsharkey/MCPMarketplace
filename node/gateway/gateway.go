@@ -54,15 +54,17 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Authenticate before reading the body, so anonymous callers cannot make
+	// the gateway parse, or the audit log record, their payload.
+	principal, authErr := g.Auth.Authenticate(r)
+	if authErr != nil {
+		g.write(w, "anonymous", service, mcpx.Request{}, &decision{code: http.StatusUnauthorized, action: "authenticate", detail: "invalid credentials"}, nil)
+		return
+	}
 	var req mcpx.Request
 	body, err := io.ReadAll(io.LimitReader(r.Body, mcpx.MaxBody))
 	if err == nil {
 		err = json.Unmarshal(body, &req)
-	}
-	principal, authErr := g.Auth.Authenticate(r)
-	if authErr != nil {
-		g.write(w, "anonymous", service, req, &decision{code: http.StatusUnauthorized, action: "authenticate", detail: "invalid credentials"}, nil)
-		return
 	}
 	if err != nil || req.JSONRPC != "2.0" || req.Method == "" {
 		g.write(w, principal, service, req, deny("parse", "malformed JSON-RPC request"), nil)
@@ -77,6 +79,9 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 	st := g.State()
 	if st == nil || st.Stale(now, g.Grace) {
 		return nil, deny("stale_feed", "feed older than grace period")
+	}
+	if !g.Policy.AllowService(principal, service) {
+		return nil, deny("policy", "principal has no grant for this service")
 	}
 	listing, ok := st.Listings[service]
 	if !ok {
@@ -113,10 +118,12 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 		return &mcpx.Response{JSONRPC: "2.0", ID: req.ID, Result: raw}, nil
 
 	case req.Method == "tools/call":
-		var p mcpx.CallParams
-		if err := json.Unmarshal(req.Params, &p); err != nil || p.Name == "" {
-			return nil, deny("parse", "invalid tools/call params")
+		p, err := strictCallParams(req.Params)
+		if err != nil {
+			return nil, deny("parse", "invalid tools/call params: %v", err)
 		}
+		// Forward exactly what was authorised, never the caller's raw bytes.
+		req.Params, _ = json.Marshal(p)
 		tools, d := g.verifiedTools(up, cert.Predicate.ManifestSHA256, json.RawMessage(`"gw-verify"`))
 		if d != nil {
 			return nil, d
@@ -127,10 +134,17 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 		if !g.Policy.Allow(principal, service, p.Name) {
 			return nil, deny("policy", "principal not granted tool %q", p.Name)
 		}
-		return g.forward(up, req)
+		return g.forward(principal, service, up, req)
 
-	case req.Method == "initialize", req.Method == "ping", strings.HasPrefix(req.Method, "notifications/"):
-		return g.forward(up, req)
+	case req.Method == "initialize":
+		resp, d := g.forward(principal, service, up, req)
+		if d == nil {
+			stripInstructions(resp)
+		}
+		return resp, d
+
+	case req.Method == "ping", strings.HasPrefix(req.Method, "notifications/"):
+		return g.forward(principal, service, up, req)
 	}
 	return nil, deny("method", "method %q not permitted", req.Method)
 }
@@ -156,12 +170,65 @@ func (g *Gateway) verifiedTools(up Upstream, want string, id json.RawMessage) ([
 	return tl.Tools, nil
 }
 
-func (g *Gateway) forward(up Upstream, req mcpx.Request) (*mcpx.Response, *decision) {
+// forward records the intent to call upstream before making the call, so no
+// side effect can happen without an audit record.
+func (g *Gateway) forward(principal, service string, up Upstream, req mcpx.Request) (*mcpx.Response, *decision) {
+	if _, err := g.Audit.Append(principal, "forward", "allow", clip(service+" "+req.Method, 512)); err != nil {
+		return nil, &decision{code: http.StatusServiceUnavailable, action: "audit", detail: "audit unavailable"}
+	}
 	resp, err := mcpx.Call(g.Client, up.URL, req)
 	if err != nil {
 		return nil, deny("upstream", "upstream call failed")
 	}
 	return &resp, nil
+}
+
+// strictCallParams accepts only {"name": string, "arguments": object?} with
+// no duplicate or differently-cased keys, so the gateway and the upstream
+// cannot disagree about which tool is being called.
+func strictCallParams(raw json.RawMessage) (mcpx.CallParams, error) {
+	if _, err := manifest.Canonicalize(raw); err != nil {
+		return mcpx.CallParams{}, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return mcpx.CallParams{}, err
+	}
+	var p mcpx.CallParams
+	for k, v := range fields {
+		switch k {
+		case "name":
+			if err := json.Unmarshal(v, &p.Name); err != nil {
+				return mcpx.CallParams{}, err
+			}
+		case "arguments":
+			p.Arguments = v
+		default:
+			return mcpx.CallParams{}, fmt.Errorf("unexpected field %q", clip(k, 64))
+		}
+	}
+	if p.Name == "" {
+		return mcpx.CallParams{}, fmt.Errorf("missing name")
+	}
+	return p, nil
+}
+
+// stripInstructions removes server instructions from an initialize result:
+// they reach the model's context but are not covered by the manifest hash.
+func stripInstructions(resp *mcpx.Response) {
+	var m map[string]json.RawMessage
+	if resp == nil || json.Unmarshal(resp.Result, &m) != nil {
+		return
+	}
+	delete(m, "instructions")
+	resp.Result, _ = json.Marshal(m)
+}
+
+func clip(s string, n int) string {
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
 }
 
 func subjectMatches(name, digest string, up Upstream) bool {
@@ -186,7 +253,7 @@ func (g *Gateway) write(w http.ResponseWriter, principal, service string, req mc
 	if d != nil {
 		result, action, detail = "deny", d.action, d.detail
 	}
-	if _, err := g.Audit.Append(principal, action, result, service+" "+req.Method+" "+detail); err != nil && d == nil {
+	if _, err := g.Audit.Append(clip(principal, 256), clip(action, 128), result, clip(service+" "+req.Method+" "+detail, 1024)); err != nil && d == nil {
 		// Fail closed: an unauditable allow becomes a deny.
 		d, resp = &decision{code: http.StatusServiceUnavailable, action: "audit", detail: "audit unavailable"}, nil
 	}
@@ -194,6 +261,10 @@ func (g *Gateway) write(w http.ResponseWriter, principal, service string, req mc
 	if d != nil {
 		w.WriteHeader(d.code)
 		json.NewEncoder(w).Encode(mcpx.Response{JSONRPC: "2.0", ID: req.ID, Error: &mcpx.Error{Code: codeDenied, Message: d.action + ": " + d.detail}})
+		return
+	}
+	if resp != nil && resp.JSONRPC == "" {
+		w.WriteHeader(http.StatusAccepted) // notification acknowledged upstream
 		return
 	}
 	json.NewEncoder(w).Encode(resp)

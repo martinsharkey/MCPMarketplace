@@ -25,6 +25,8 @@ func (s StaticTokens) Authenticate(r *http.Request) (string, error) {
 
 // Policy decides whether principal may use tool on service. Replaced by OPA in Plan 5.
 type Policy interface {
+	// AllowService gates every method on a service, not only tool calls.
+	AllowService(principal, service string) bool
 	Allow(principal, service, tool string) bool
 }
 
@@ -35,3 +37,5 @@ func (g Grants) Allow(principal, service, tool string) bool {
 	tools := g[principal][service]
 	return slices.Contains(tools, "*") || slices.Contains(tools, tool)
 }
+
+func (g Grants) AllowService(principal, service string) bool { return len(g[principal][service]) > 0 }

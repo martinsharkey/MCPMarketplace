@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"sort"
 	"strconv"
@@ -19,11 +20,11 @@ import (
 func Canonicalize(raw []byte) ([]byte, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
+	v, err := readValue(dec)
+	if err != nil {
 		return nil, fmt.Errorf("canonicalize: %w", err)
 	}
-	if dec.More() {
+	if _, err := dec.Token(); err != io.EOF {
 		return nil, errors.New("canonicalize: trailing data")
 	}
 	var b bytes.Buffer
@@ -31,6 +32,52 @@ func Canonicalize(raw []byte) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
+}
+
+// readValue decodes one JSON value, rejecting duplicate object keys as
+// RFC 8785 (I-JSON) requires. A duplicate key could otherwise let two
+// parsers disagree about content that hashes identically.
+func readValue(dec *json.Decoder) (any, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	switch t := tok.(type) {
+	case json.Delim:
+		switch t {
+		case '{':
+			m := map[string]any{}
+			for dec.More() {
+				kt, err := dec.Token()
+				if err != nil {
+					return nil, err
+				}
+				k := kt.(string)
+				if _, dup := m[k]; dup {
+					return nil, fmt.Errorf("duplicate key %q", k)
+				}
+				if m[k], err = readValue(dec); err != nil {
+					return nil, err
+				}
+			}
+			_, err = dec.Token()
+			return m, err
+		case '[':
+			a := []any{}
+			for dec.More() {
+				v, err := readValue(dec)
+				if err != nil {
+					return nil, err
+				}
+				a = append(a, v)
+			}
+			_, err = dec.Token()
+			return a, err
+		}
+		return nil, fmt.Errorf("unexpected %v", t)
+	default:
+		return t, nil
+	}
 }
 
 func writeValue(b *bytes.Buffer, v any) error {

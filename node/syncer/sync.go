@@ -12,6 +12,13 @@ import (
 )
 
 // ErrReplay means the feed is not newer than the one already applied.
+// ErrFutureFeed means the feed claims a creation time in the future, which
+// would otherwise extend the offline grace period by the skew.
+var ErrFutureFeed = errors.New("syncer: feed created in the future")
+
+// MaxClockSkew is the tolerated clock difference between Innovox and the node.
+const MaxClockSkew = 5 * time.Minute
+
 var ErrReplay = errors.New("syncer: feed sequence not newer than current state")
 
 // Apply verifies env against the pinned root and, on success, replaces the
@@ -22,6 +29,9 @@ func Apply(st *State, env attest.Envelope, rootPub ed25519.PublicKey, now time.T
 	idx, err := feed.Open(env, kr, now)
 	if err != nil {
 		return fmt.Errorf("syncer: %w", err)
+	}
+	if idx.CreatedAt.After(now.Add(MaxClockSkew)) {
+		return ErrFutureFeed
 	}
 	if idx.Seq <= st.Seq {
 		return ErrReplay

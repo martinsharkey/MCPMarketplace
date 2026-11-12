@@ -61,6 +61,10 @@ func Call(c *http.Client, url string, req Request) (Response, error) {
 		return Response{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusAccepted {
+		// Streamable HTTP acknowledges notifications with 202 and no body.
+		return Response{}, nil
+	}
 	if mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type")); mt != "application/json" {
 		return Response{}, fmt.Errorf("mcpx: unsupported response type %q", mt)
 	}

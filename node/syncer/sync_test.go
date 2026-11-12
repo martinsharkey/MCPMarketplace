@@ -114,3 +114,11 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		t.Fatalf("load: %v %+v", err, back)
 	}
 }
+
+func TestApplyRejectsFutureDatedFeed(t *testing.T) {
+	p := testpki.New(now.Add(48 * time.Hour))
+	st := NewState()
+	if err := Apply(st, p.Feed(1, nil, nil), p.RootPub, now); err == nil {
+		t.Fatal("future-dated feed accepted")
+	}
+}
