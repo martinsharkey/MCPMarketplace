@@ -799,8 +799,13 @@ All values are targets for the pilot unless stated.
 | **5 — Runtime and factory** | Runtime Controller (gVisor, admission by certificate); Factory (OpenAPI create and import); customer-local T1 signing for disconnected nodes | 2, 3 |
 | **6 — Experience and packaging** | Catalogue Portal; access-request workflow; evidence-pack rendering; Helm profiles; offline bundle; marketplace listings | 2, 4, 5 |
 | **7 — Protocol completeness** | Official MCP SDK; SSE and sessions; A2A task proxying with Agent Card verification; token exchange; output inspection; human approval | 2 |
+| **R1 — First reference service: OpenSearch** | Import the official `opensearch-project/opensearch-mcp-server-py` through the import path (mirror, pin, rebuild, certify at T2) to give Defence customers search and RAG on day one. Use OpenSearch for node catalogue search and an assessor-side store of the scheme's source standards. Lookalike repackages on PyPI are a live example of what the import path must reject. | 3, 4, 5 |
 
 *The earlier spec numbered Plans 2–5 differently. This table supersedes it.*
+
+### 14.3 Measuring the build against the scheme
+
+The scheme is held as code in `scheme/`: controls mapped to verified clauses of each standard in §10.3. `go run ./cmd/innovox-conformance` measures this repository against it and writes `docs/conformance/self-assessment.md`, giving status by control and coverage by standard. An adversarial corpus (`test/adversarial`) runs malicious MCP behaviours through the gateway. See PR #3.
 
 ---
 
