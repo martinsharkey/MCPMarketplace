@@ -97,3 +97,15 @@ func TestRenderStandardsCoverage(t *testing.T) {
 		}
 	}
 }
+
+func TestEvidenceOrderIsStable(t *testing.T) {
+	const a = `{"Action":"output","Package":"z","Test":"T","Output":"innovox-control: IAS-RT-02\n"}
+{"Action":"pass","Package":"z","Test":"T"}
+{"Action":"output","Package":"a","Test":"T","Output":"innovox-control: IAS-RT-02\n"}
+{"Action":"pass","Package":"a","Test":"T"}
+`
+	ev, _ := ParseEvents(strings.NewReader(a))
+	if got := ev["IAS-RT-02"]; len(got) != 2 || got[0].Name != "a.T" {
+		t.Fatalf("evidence not sorted: %+v", got)
+	}
+}

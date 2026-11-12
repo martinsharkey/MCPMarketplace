@@ -1,3 +1,6 @@
+// Package e2e runs the whole trust-chain lifecycle in one test: certify,
+// publish, carry across an air gap, sync, call through the gateway, block a
+// rug pull, revoke, and verify the audit chain.
 package e2e
 
 import (

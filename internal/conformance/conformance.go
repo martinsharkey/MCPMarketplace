@@ -83,6 +83,10 @@ func ParseEvents(r io.Reader) (Evidence, error) {
 			ev[id] = append(ev[id], TestResult{Name: name, Passed: result[name]})
 		}
 	}
+	// Packages run in parallel, so sort for a stable, diff-friendly report.
+	for id := range ev {
+		sort.Slice(ev[id], func(i, j int) bool { return ev[id][i].Name < ev[id][j].Name })
+	}
 	return ev, sc.Err()
 }
 
