@@ -1,0 +1,544 @@
+{
+  "scheme": "Innovox Assured",
+  "version": "v0.1",
+  "status": "Draft for pilot",
+  "claim": "Independently tested by Innovox against the Innovox Assured scheme v0.1, with signed evidence mapped to MOD and NCSC guidance.",
+  "controls": [
+    {
+      "id": "IAS-GOV-01",
+      "family": "Governance",
+      "title": "Claim wording is fixed",
+      "requirement": "Certificates and every rendered evidence pack use only the scheme claim, which never asserts MOD or NCSC certification or approval.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["INV-CLAIM", "SBD-P1"]
+    },
+    {
+      "id": "IAS-GOV-02",
+      "family": "Governance",
+      "title": "Tier rules are enforced at signing",
+      "requirement": "The signer refuses T2 without a named assessor, refuses tiers not yet operated, and caps remote endpoints at T1.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["INV-TIERS", "JSP936-206", "ETSI-5.2.5-2.1"]
+    },
+    {
+      "id": "IAS-GOV-03",
+      "family": "Governance",
+      "title": "Separation of duties for assessors",
+      "requirement": "An assessor cannot sign a service they, or their team, advised on; every sign-off decision is recorded with reasons.",
+      "scope": "platform",
+      "tiers": ["T2", "T3"],
+      "method": "document",
+      "maps_to": ["ETSI-5.2.5-2.1", "JSP936-200", "FVEY-THIRD-PARTY"]
+    },
+    {
+      "id": "IAS-SC-01",
+      "family": "Supply chain",
+      "title": "Publisher owns the service namespace",
+      "requirement": "Namespace ownership is proved by DNS, HTTP or source-host OIDC challenge before any testing.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S1",
+      "maps_to": ["NSA-SUPPORTED", "MCP-T11", "MCP09"]
+    },
+    {
+      "id": "IAS-SC-02",
+      "family": "Supply chain",
+      "title": "Provenance matches a pinned build identity",
+      "requirement": "Build provenance is verified and its repository, builder and workflow match the publisher's declared identity; a bare signature is not sufficient.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S2",
+      "maps_to": ["SSCOP-2.1", "ETSI-5.2.3-1", "MCP-T11", "MCP04", "ASI04", "SBD-P2"]
+    },
+    {
+      "id": "IAS-SC-03",
+      "family": "Supply chain",
+      "title": "Rebuilt from source",
+      "requirement": "The image is rebuilt by Innovox from the pinned source with pinned base images and the resulting digest is the one certified.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "pipeline",
+      "stage": "S2",
+      "maps_to": ["SSCOP-2.2", "ETSI-5.2.3-1", "JSP936-201"]
+    },
+    {
+      "id": "IAS-SC-04",
+      "family": "Supply chain",
+      "title": "Software bill of materials",
+      "requirement": "A CycloneDX SBOM covering all dependencies is generated, hashed into the evidence and retained for vulnerability watching.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S3",
+      "maps_to": ["SSCOP-1.2", "ETSI-5.2.1-1", "FVEY-THIRD-PARTY"]
+    },
+    {
+      "id": "IAS-SC-05",
+      "family": "Supply chain",
+      "title": "No unaccepted known vulnerabilities",
+      "requirement": "No critical or high vulnerabilities in code, dependencies or image unless an assessor accepts a VEX statement explaining non-exploitability.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S3",
+      "maps_to": ["SSCOP-3.3", "ETSI-5.4.1-1", "NSA-PATCH", "SBD-P2"]
+    },
+    {
+      "id": "IAS-SC-06",
+      "family": "Supply chain",
+      "title": "Publisher organisational certification",
+      "requirement": "The publisher holds Defence Cyber Certification at the level matching the intended use (Level 2 or above implies Cyber Essentials Plus), or declares the gap for the customer's SRO.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "document",
+      "maps_to": ["DCC-L0", "DCC-L1", "DCC-L2", "DCC-L3", "JSP936-200"]
+    },
+    {
+      "id": "IAS-SC-07",
+      "family": "Supply chain",
+      "title": "Vulnerability disclosure and support",
+      "requirement": "The publisher publishes a vulnerability disclosure policy and states the support period and update commitments for the service.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "document",
+      "maps_to": ["SSCOP-3.2", "SSCOP-4.1", "ETSI-5.2.2-4"]
+    },
+    {
+      "id": "IAS-CODE-01",
+      "family": "Code analysis",
+      "title": "Static analysis clean",
+      "requirement": "Static analysis reports no high-severity findings, including command, SQL and path injection sinks reachable from tool inputs.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S3",
+      "maps_to": ["SSCOP-1.1", "SSCOP-1.3", "ETSI-5.2.5-1", "MCP05", "MCP-T3"]
+    },
+    {
+      "id": "IAS-CODE-02",
+      "family": "Code analysis",
+      "title": "No embedded secrets",
+      "requirement": "No credentials, tokens or keys are present in source, history of the pinned commit, or the image.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S3",
+      "maps_to": ["MCP01", "MCP-T5"]
+    },
+    {
+      "id": "IAS-MCP-01",
+      "family": "MCP integrity",
+      "title": "Tool descriptions free of hidden instructions",
+      "requirement": "Tool names, descriptions and schemas contain no instructions to the model, invisible characters, cross-tool references or exfiltration patterns.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S4",
+      "maps_to": ["MCP03", "MCP06", "MCP-T4", "ASI01", "NSA-BOUNDARIES"]
+    },
+    {
+      "id": "IAS-MCP-02",
+      "family": "MCP integrity",
+      "title": "Tool manifest pinned in the certificate",
+      "requirement": "The canonical (RFC 8785) SHA-256 of the live tool list is recorded in the certificate.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S5",
+      "maps_to": ["MCP-T6", "ETSI-5.2.4-1.2", "ETSI-5.2.1-2"]
+    },
+    {
+      "id": "IAS-MCP-03",
+      "family": "MCP integrity",
+      "title": "Least capability",
+      "requirement": "The service exposes only the tools its declared purpose needs; shell, arbitrary filesystem and arbitrary network tools are justified or absent.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S4",
+      "maps_to": ["MCP02", "SBD-P7", "ETSI-5.1.2-6", "ASI02"]
+    },
+    {
+      "id": "IAS-MCP-04",
+      "family": "MCP integrity",
+      "title": "Inputs validated against schema",
+      "requirement": "Schema fuzzing finds no crash, unhandled error or behaviour outside the tool's declared purpose for malformed, oversized or out-of-range input.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "pipeline",
+      "stage": "S6",
+      "maps_to": ["NSA-PARAMS", "MCP-T3", "MCP05", "JSP936-171"]
+    },
+    {
+      "id": "IAS-MCP-05",
+      "family": "MCP integrity",
+      "title": "A2A Agent Card pinned",
+      "requirement": "For A2A agents, the canonical Agent Card hash is recorded in the certificate and the card is countersigned by Innovox.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S5",
+      "maps_to": ["ASI07", "MCP-T6"]
+    },
+    {
+      "id": "IAS-AUTH-01",
+      "family": "Identity",
+      "title": "OAuth 2.1 conformance",
+      "requirement": "Remote services validate token audience, never pass client tokens to downstream services, and implement resource indicators and protected resource metadata.",
+      "scope": "service",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "pipeline",
+      "stage": "S6",
+      "maps_to": ["MCP07", "MCP01", "MCP-T1", "MCP-T7", "ASI03", "FVEY-PRIVILEGES"]
+    },
+    {
+      "id": "IAS-AUTH-02",
+      "family": "Identity",
+      "title": "Safe network binding",
+      "requirement": "The service listens only on its configured interface and resists DNS rebinding.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "pipeline",
+      "stage": "S6",
+      "maps_to": ["MCP-T8"]
+    },
+    {
+      "id": "IAS-BEH-01",
+      "family": "Behaviour",
+      "title": "No undeclared behaviour in the sandbox",
+      "requirement": "Scripted calls under a syscall-tracing sandbox show no file, process or network activity beyond what the service declares.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "pipeline",
+      "stage": "S7",
+      "maps_to": ["NSA-SANDBOX", "ASI05", "MCP05", "JSP936-171"]
+    },
+    {
+      "id": "IAS-AI-01",
+      "family": "AI behaviour",
+      "title": "Adversarial testing",
+      "requirement": "Red-team probes for injection through tool outputs, data exfiltration and excessive agency stay within the tier's thresholds.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "pipeline",
+      "stage": "S8",
+      "maps_to": ["ASI01", "ASI06", "MCP06", "MCP10", "JSP936-209", "JSP936-81", "ETSI-5.2.5-4.1", "FVEY-REDTEAM"]
+    },
+    {
+      "id": "IAS-AI-02",
+      "family": "AI behaviour",
+      "title": "Operating conditions statement",
+      "requirement": "The publisher supplies the service's purpose, data handled, operating limits, known weaknesses and failure modes.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "document",
+      "maps_to": ["JSP936-165", "JSP936-82", "ETSI-5.3.1-2.1"]
+    },
+    {
+      "id": "IAS-AI-03",
+      "family": "AI behaviour",
+      "title": "Security Operating Procedures",
+      "requirement": "The publisher supplies SyOPs specific to the service, covering configuration, permitted use and incident contacts.",
+      "scope": "service",
+      "tiers": ["T2", "T3"],
+      "method": "document",
+      "maps_to": ["JSP936-178"]
+    },
+    {
+      "id": "IAS-T3-01",
+      "family": "Mission assurance",
+      "title": "Manual penetration test by a cleared tester",
+      "requirement": "A cleared, independent tester performs a manual penetration test and red-team, and findings are closed or accepted before signing.",
+      "scope": "service",
+      "tiers": ["T3"],
+      "method": "manual",
+      "maps_to": ["ETSI-5.2.5-2.1", "JSP936-209", "JSP936-197"]
+    },
+    {
+      "id": "IAS-TRUST-01",
+      "family": "Trust chain",
+      "title": "Signatures chain to the pinned root",
+      "requirement": "Certificates and feeds verify only under signer keys delegated by the pinned root; the root never signs content; tampering or foreign keys fail.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP-T6", "SSCOP-3.1", "FVEY-PRIVILEGES", "NSA-SIGN"]
+    },
+    {
+      "id": "IAS-TRUST-02",
+      "family": "Trust chain",
+      "title": "Replay, rollback and clock abuse rejected",
+      "requirement": "Nodes reject feeds that are not newer than the current one or are dated in the future, and apply feeds atomically.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["NSA-SIGN", "MCP-T7"]
+    },
+    {
+      "id": "IAS-TRUST-03",
+      "family": "Trust chain",
+      "title": "Signer key revocation",
+      "requirement": "A compromised signer key can be revoked by the root and nodes stop trusting it at the next sync.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["ETSI-5.2.2-5", "SSCOP-2.1"]
+    },
+    {
+      "id": "IAS-TRUST-04",
+      "family": "Trust chain",
+      "title": "Air-gapped distribution",
+      "requirement": "A single-file bundle carries the feed across an air gap and verifies identically to the online feed.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["SSCOP-3.1", "NSA-BOUNDARIES"]
+    },
+    {
+      "id": "IAS-TRUST-05",
+      "family": "Trust chain",
+      "title": "Revocations take effect",
+      "requirement": "A published revocation denies the service on every node at its next sync, and revocations that match no certificate are refused at publication.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["SSCOP-3.5", "ETSI-5.4.1-1"]
+    },
+    {
+      "id": "IAS-RT-01",
+      "family": "Run-time enforcement",
+      "title": "Fail closed",
+      "requirement": "The gateway denies when the feed is stale, the service is unlisted or not running, or any verification step fails.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["FVEY-SECURE-DEFAULT", "FVEY-RESILIENCE", "SBD-P8", "ASI08"]
+    },
+    {
+      "id": "IAS-RT-02",
+      "family": "Run-time enforcement",
+      "title": "Rug pulls blocked",
+      "requirement": "The live tool manifest is re-hashed on every list and call and any difference from the certificate is denied and audited; paginated lists are refused rather than partially hashed.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP-T6", "MCP03", "ASI04", "NSA-BOUNDARIES", "ETSI-5.4.1-2"]
+    },
+    {
+      "id": "IAS-RT-03",
+      "family": "Run-time enforcement",
+      "title": "Hidden tools blocked",
+      "requirement": "Calls to any tool not in the verified manifest are denied before reaching the service.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP-T6", "ASI02", "MCP09"]
+    },
+    {
+      "id": "IAS-RT-04",
+      "family": "Run-time enforcement",
+      "title": "Least privilege per principal and tool",
+      "requirement": "Every method needs a grant on the service; tool lists are filtered and tool calls checked per principal and tool.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP02", "MCP-T2", "ASI03", "FVEY-PRIVILEGES", "SBD-P7", "ETSI-5.1.2-6", "ETSI-5.2.2-1"]
+    },
+    {
+      "id": "IAS-RT-05",
+      "family": "Run-time enforcement",
+      "title": "Strict request parsing",
+      "requirement": "Tool-call parameters with duplicate, unknown or case-variant keys are rejected and only the authorised call is forwarded.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["NSA-PARAMS", "MCP-T3", "MCP-T9"]
+    },
+    {
+      "id": "IAS-RT-06",
+      "family": "Run-time enforcement",
+      "title": "Expired and revoked certificates denied",
+      "requirement": "Calls are denied from the moment a certificate expires or a revocation is applied, including mid-session.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["SSCOP-3.5", "ETSI-5.4.1-1", "SBD-P9"]
+    },
+    {
+      "id": "IAS-RT-07",
+      "family": "Run-time enforcement",
+      "title": "Unpinned instruction channels removed",
+      "requirement": "Server-supplied instructions outside the certified manifest (such as initialize.instructions) never reach the agent.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP06", "MCP-T4", "ASI01"]
+    },
+    {
+      "id": "IAS-RT-08",
+      "family": "Run-time enforcement",
+      "title": "No credential passthrough",
+      "requirement": "The caller's credentials are never forwarded to a service; services receive only short-lived, audience-scoped tokens issued by token exchange.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP01", "MCP-T1", "FVEY-PRIVILEGES", "ASI03"]
+    },
+    {
+      "id": "IAS-RT-09",
+      "family": "Run-time enforcement",
+      "title": "Output inspection",
+      "requirement": "Tool outputs are size-limited, scanned for injection markers and data-loss patterns, and handled per policy before reaching the agent.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["NSA-OUTPUT", "ASI06", "MCP10", "FVEY-DEFENCE-IN-DEPTH"]
+    },
+    {
+      "id": "IAS-RT-10",
+      "family": "Run-time enforcement",
+      "title": "Human approval for high-impact tools",
+      "requirement": "Calls to tools tagged high-impact are held until a named human approves them.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["FVEY-HITL", "ETSI-5.1.4-1", "ETSI-5.1.4-3", "ASI09"]
+    },
+    {
+      "id": "IAS-RT-11",
+      "family": "Run-time enforcement",
+      "title": "Kill switch",
+      "requirement": "An operator can stop a service, an agent or all traffic immediately, and the action is audited.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["ETSI-5.1.4-3", "ASI10", "FVEY-RESILIENCE"]
+    },
+    {
+      "id": "IAS-RT-12",
+      "family": "Run-time enforcement",
+      "title": "Rate limits and quotas",
+      "requirement": "Per-principal and per-service rate limits and request-size limits protect services and the gateway from exhaustion.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP-T10", "ETSI-5.2.2-2", "FVEY-RATE", "ASI08"]
+    },
+    {
+      "id": "IAS-RT-13",
+      "family": "Run-time enforcement",
+      "title": "Authenticate before processing",
+      "requirement": "Unauthenticated requests are rejected before their body is parsed or logged.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP07", "MCP-T1", "MCP-T10"]
+    },
+    {
+      "id": "IAS-ISO-01",
+      "family": "Isolation",
+      "title": "Sandboxed service runtime",
+      "requirement": "Certified services run in a kernel-isolating sandbox with egress denied by default, a read-only filesystem and no platform credentials.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["NSA-SANDBOX", "ASI05", "MCP-T8", "FVEY-ISOLATION"]
+    },
+    {
+      "id": "IAS-ISO-02",
+      "family": "Isolation",
+      "title": "Running artefact matches certificate",
+      "requirement": "The gateway denies a service whose running image digest (or remote URL) differs from the certificate subject, with the digest attested by the runtime rather than configuration.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP-T6", "ETSI-5.2.1-2", "MCP09"]
+    },
+    {
+      "id": "IAS-AUD-01",
+      "family": "Audit",
+      "title": "Every decision audited before effect",
+      "requirement": "Every allow and deny is recorded, and a call is forwarded only after its audit record is durably written.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP08", "MCP-T12", "NSA-LOGGING", "ETSI-5.4.2-1", "SBD-P5", "FVEY-ACCOUNTABILITY"]
+    },
+    {
+      "id": "IAS-AUD-02",
+      "family": "Audit",
+      "title": "Tamper-evident audit",
+      "requirement": "Audit records form a hash chain; edits, deletions and reordering are detected and a broken chain refuses to extend.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["ETSI-5.2.4-3", "FVEY-ISOLATION", "MCP-T12"]
+    },
+    {
+      "id": "IAS-AUD-03",
+      "family": "Audit",
+      "title": "SIEM export and anchored checkpoints",
+      "requirement": "Audit events stream to the customer SIEM and signed checkpoints make truncation detectable.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["NSA-LOGGING", "SBD-P5", "FVEY-MONITORING", "ETSI-5.4.2-2"]
+    },
+    {
+      "id": "IAS-AUD-04",
+      "family": "Audit",
+      "title": "Audit cannot be abused",
+      "requirement": "Logged fields are bounded so audit cannot be used to exhaust storage, break the chain or exfiltrate payloads.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["MCP-T10", "MCP-T5"]
+    },
+    {
+      "id": "IAS-VULN-01",
+      "family": "Vulnerability management",
+      "title": "Continuous vulnerability watch",
+      "requirement": "New advisories are matched against stored SBOMs and trigger recertification or revocation within published timescales.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["SSCOP-3.3", "NSA-PATCH", "ETSI-5.4.1-1", "SBD-P9"]
+    },
+    {
+      "id": "IAS-INV-01",
+      "family": "Vulnerability management",
+      "title": "Inventory of deployed services",
+      "requirement": "Each node can report every certified service version it accepts and runs, with certificate and tier.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "automated",
+      "maps_to": ["NSA-PATCH", "ETSI-5.2.1-1", "MCP09"]
+    },
+    {
+      "id": "IAS-PLAT-01",
+      "family": "Platform assurance",
+      "title": "Innovox components certified under the scheme",
+      "requirement": "Every Innovox Assured image passes the service controls it can be measured against before release.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "document",
+      "maps_to": ["INV-PLATFORM", "SSCOP-1.2", "SBD-P9"]
+    },
+    {
+      "id": "IAS-PLAT-02",
+      "family": "Platform assurance",
+      "title": "Secure development practice",
+      "requirement": "Changes are test-first, statically checked, independently reviewed and traceable to a plan before merge.",
+      "scope": "platform",
+      "tiers": ["T1", "T2", "T3"],
+      "method": "document",
+      "maps_to": ["SSCOP-1.1", "SSCOP-1.3", "ETSI-5.2.5-1", "SBD-P10"]
+    }
+  ]
+}
