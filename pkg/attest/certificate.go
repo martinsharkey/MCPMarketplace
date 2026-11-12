@@ -56,18 +56,26 @@ func (c Certificate) Claim() string { return fmt.Sprintf(ClaimText, c.SchemeVers
 
 // OpenCertificate verifies an envelope and decodes the Innovox certificate.
 func OpenCertificate(env Envelope, keys map[string]ed25519.PublicKey) (Statement, error) {
+	st, _, err := OpenCertificateWithSigner(env, keys)
+	return st, err
+}
+
+// OpenCertificateWithSigner is OpenCertificate, also returning the ID of the
+// key that signed the certificate.
+func OpenCertificateWithSigner(env Envelope, keys map[string]ed25519.PublicKey) (Statement, string, error) {
 	if env.PayloadType != PayloadType {
-		return Statement{}, fmt.Errorf("attest: payloadType %q", env.PayloadType)
+		return Statement{}, "", fmt.Errorf("attest: payloadType %q", env.PayloadType)
 	}
-	if _, err := VerifyEnvelope(env, keys); err != nil {
-		return Statement{}, err
+	signer, err := VerifyEnvelope(env, keys)
+	if err != nil {
+		return Statement{}, "", err
 	}
 	var st Statement
 	if err := json.Unmarshal(env.Payload, &st); err != nil {
-		return Statement{}, fmt.Errorf("attest: decode: %w", err)
+		return Statement{}, "", fmt.Errorf("attest: decode: %w", err)
 	}
 	if st.Type != StatementType || st.PredicateType != PredicateType {
-		return Statement{}, fmt.Errorf("attest: unexpected statement %q / %q", st.Type, st.PredicateType)
+		return Statement{}, "", fmt.Errorf("attest: unexpected statement %q / %q", st.Type, st.PredicateType)
 	}
-	return st, nil
+	return st, signer, nil
 }

@@ -134,3 +134,29 @@ func (k *Keyring) SignerKeys(now time.Time) map[string]ed25519.PublicKey {
 	}
 	return out
 }
+
+// AllSignerKeys returns every delegated key that is not revoked, whether or
+// not its delegation is current. Use it with ValidAt to check something that
+// was signed in the past, such as a certificate.
+func (k *Keyring) AllSignerKeys() map[string]ed25519.PublicKey {
+	out := map[string]ed25519.PublicKey{}
+	for _, d := range k.delegations {
+		if !k.revoked[d.KeyID] {
+			out[d.KeyID] = ed25519.PublicKey(d.PublicKey)
+		}
+	}
+	return out
+}
+
+// ValidAt reports whether keyID was delegated at time t and is not revoked.
+func (k *Keyring) ValidAt(keyID string, t time.Time) bool {
+	if k.revoked[keyID] {
+		return false
+	}
+	for _, d := range k.delegations {
+		if d.KeyID == keyID && !t.Before(d.NotBefore) && t.Before(d.NotAfter) {
+			return true
+		}
+	}
+	return false
+}

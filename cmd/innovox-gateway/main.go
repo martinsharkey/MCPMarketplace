@@ -4,6 +4,7 @@
 //	{
 //	  "listen": ":8443",
 //	  "stateFile": "state.json",
+//	  "rootKeyFile": "root.pub",                 // pinned Innovox root; state is re-verified against it
 //	  "auditFile": "audit.log",
 //	  "auditExportFile": "audit-export.jsonl",   // optional: JSON lines for a SIEM forwarder
 //	  "checkpointKeyFile": "audit.key",          // optional: signs a checkpoint every checkpointMinutes
@@ -45,6 +46,7 @@ type rate struct {
 type config struct {
 	Listen            string               `json:"listen"`
 	StateFile         string               `json:"stateFile"`
+	RootKeyFile       string               `json:"rootKeyFile"`
 	AuditFile         string               `json:"auditFile"`
 	AuditExportFile   string               `json:"auditExportFile"`
 	CheckpointKeyFile string               `json:"checkpointKeyFile"`
@@ -107,6 +109,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	rb, err := os.ReadFile(c.RootKeyFile)
+	if err != nil {
+		log.Fatalf("rootKeyFile: %v", err)
+	}
+	root, err := hex.DecodeString(strings.TrimSpace(string(rb)))
+	if err != nil || len(root) != ed25519.PublicKeySize {
+		log.Fatal("rootKeyFile: not a valid root public key")
+	}
 	ups := map[string]gateway.Upstream{}
 	for _, u := range c.Upstreams {
 		ups[u.Service] = u
@@ -118,9 +128,18 @@ func main() {
 	inspector := gateway.DefaultInspector(c.BlockMarkings...)
 	inspector.WarnOnly = c.InspectWarnOnly
 	g := &gateway.Gateway{
-		// State is re-read per request so a sync takes effect immediately;
-		// an unreadable state file yields nil, which the gateway denies.
-		State:     func() *syncer.State { st, _ := syncer.Load(c.StateFile); return st },
+		// State is re-read and re-verified against the pinned root on every
+		// request, so a sync takes effect immediately and an edited state
+		// file is never trusted. A state that does not verify yields nil,
+		// which the gateway denies.
+		State: func() *syncer.State {
+			st, err := syncer.LoadVerified(c.StateFile, root, time.Now())
+			if err != nil {
+				log.Printf("state: %v", err)
+				return nil
+			}
+			return st
+		},
 		Upstreams: ups, Auth: c.Tokens, Policy: c.Grants, Audit: lg,
 		Grace: time.Duration(c.GraceHours) * time.Hour, Now: time.Now,
 		Client:         &http.Client{Timeout: 30 * time.Second},

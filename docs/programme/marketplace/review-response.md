@@ -10,13 +10,13 @@ Tracks every finding in [design-review.md](design-review.md). Update this file w
 
 | ID | Finding | Status | Where it stands |
 |---|---|---|---|
-| C1 | Online key can undo a revocation and cannot be revoked | Partly fixed | The root can now revoke a signer key and nodes keep that revocation for good (`pkg/trust`, `node/syncer`). Still open: a newer feed that omits a certificate revocation reinstates the service, and one key signs both certificates and feeds. Control IAS-TRUST-06. |
-| C2 | Certificates die when their signing key is rotated | Open | Approved. Control IAS-TRUST-07. |
-| C3 | Gateway speaks a superseded MCP revision | Open | Approved. Needs its own plan (change 1). Control IAS-RT-14. |
-| C4 | Audit record does not say which tool was called | Open | Approved. Control IAS-AUD-05. |
-| C5 | Gateway trusts its state file | Open | Approved. Control IAS-TRUST-08. |
+| C1 | Online key can undo a revocation and cannot be revoked | Partly fixed | The root can revoke a signer key, and nodes keep both key and certificate revocations for good (IAS-TRUST-03, IAS-TRUST-06). Still open: one key signs both certificates and feeds, and there are no thresholds or root rotation (IAS-TRUST-09). |
+| C2 | Certificates die when their signing key is rotated | Fixed | A certificate is checked against the key's delegation at the time it was issued (IAS-TRUST-07). |
+| C3 | Gateway speaks a superseded MCP revision | Open | Approved. Planned as Plan 1b part A. Control IAS-RT-14. |
+| C4 | Audit record does not say which tool was called | Fixed | Records carry the tool, an arguments digest, certificate digest, manifest hash, outcome and duration (IAS-AUD-05). |
+| C5 | Gateway trusts its state file | Fixed | Listings are rebuilt from the signed feed against the pinned root on every load (IAS-TRUST-08). Swapping the whole file for an older valid one is not detected. |
 | C6 | Running image digest is a configuration value | Open | Approved. Already recorded as partial under IAS-ISO-02. Needs the runtime controller. |
-| C7 | No transport security | Partly fixed | Server timeouts added. TLS, mutual TLS and OIDC are open. Control IAS-RT-15. |
+| C7 | No transport security | Partly fixed | Server timeouts added. TLS, mutual TLS and OIDC are open. Planned as Plan 1b part C. Control IAS-RT-15. |
 | C8 | Audit chain is not anchored | Partly fixed | Signed checkpoints and an export sink are built (IAS-AUD-03). Log rotation and avoiding a full re-verify at every start are open. |
 | C9 | Tools only: prompts, resources and other methods are denied | Open | Not yet approved. The scheme should state the scope limit. |
 | C10 | Every call re-reads state and re-lists tools upstream | Open | Not yet approved. |
@@ -29,7 +29,7 @@ Tracks every finding in [design-review.md](design-review.md). Update this file w
 
 | ID | Finding | Status | Where it stands |
 |---|---|---|---|
-| T1 | Feed re-invents part of The Update Framework | Open | Approved (change 2). Needs its own plan. |
+| T1 | Feed re-invents part of The Update Framework | Open | Approved (change 2). Planned as Plan 1b part B. Control IAS-TRUST-09. |
 | T2 | No transparency log | Open | Not yet approved. |
 | T3 | No post-quantum path | Open | Not yet approved. |
 | T4 | Pinning protects descriptions, not outputs | Partly fixed | Pattern-based output inspection and size limits are built (IAS-RT-09). Output-schema enforcement, link handling and taint tracking are open. |
@@ -54,7 +54,7 @@ Tracks every finding in [design-review.md](design-review.md). Update this file w
 
 Built after commit `9f7caf5`, so the review does not mention it:
 
-- The scheme as code: 52 controls mapped to verified clauses (`scheme/`).
+- The scheme as code: 59 controls mapped to verified clauses (`scheme/`).
 - A conformance harness and generated self-assessment (`cmd/innovox-conformance`, `docs/conformance/`).
 - An adversarial corpus of malicious MCP behaviours (`test/adversarial`).
 - Kill switch, rate limits, output inspection, signer-key revocation, audit export and checkpoints.

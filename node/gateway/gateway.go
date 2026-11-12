@@ -3,10 +3,13 @@
 package gateway
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,11 +98,12 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		g.write(w, principal, service, req, deny("parse", "malformed JSON-RPC request"), nil)
 		return
 	}
-	resp, d := g.handle(principal, service, req)
-	g.write(w, principal, service, req, d, resp)
+	fields := map[string]string{} // structured audit facts, filled in as the request is understood
+	resp, d := g.handle(principal, service, req, fields)
+	g.writeFields(w, principal, service, req, d, resp, fields)
 }
 
-func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Response, *decision) {
+func (g *Gateway) handle(principal, service string, req mcpx.Request, fields map[string]string) (*mcpx.Response, *decision) {
 	now := g.Now()
 	st := g.State()
 	if st == nil || st.Stale(now, g.Grace) {
@@ -116,6 +120,7 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 		return nil, deny("revoked", "certificate revoked: %s", listing.RevokeReason)
 	}
 	cert := listing.Cert
+	fields["cert_digest"], fields["manifest_sha256"] = listing.CertDigest, cert.Predicate.ManifestSHA256
 	if !now.Before(cert.Predicate.ExpiresAt) {
 		return nil, deny("expired", "certificate expired %s", cert.Predicate.ExpiresAt.Format(time.RFC3339))
 	}
@@ -149,6 +154,9 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 		}
 		// Forward exactly what was authorised, never the caller's raw bytes.
 		req.Params, _ = json.Marshal(p)
+		// Record which tool and a digest of its arguments: enough to tie a
+		// record to a call without writing the arguments to the log.
+		fields["tool"], fields["args_sha256"] = clip(p.Name, 128), argsDigest(p.Arguments)
 		tools, d := g.verifiedTools(up, cert.Predicate.ManifestSHA256, json.RawMessage(`"gw-verify"`))
 		if d != nil {
 			return nil, d
@@ -159,7 +167,7 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 		if !g.Policy.Allow(principal, service, p.Name) {
 			return nil, deny("policy", "principal not granted tool %q", p.Name)
 		}
-		resp, d := g.forward(principal, service, up, req)
+		resp, d := g.forward(principal, service, up, req, fields)
 		if d != nil || g.Inspect == nil {
 			return resp, d
 		}
@@ -176,14 +184,14 @@ func (g *Gateway) handle(principal, service string, req mcpx.Request) (*mcpx.Res
 		return resp, nil
 
 	case req.Method == "initialize":
-		resp, d := g.forward(principal, service, up, req)
+		resp, d := g.forward(principal, service, up, req, fields)
 		if d == nil {
 			stripInstructions(resp)
 		}
 		return resp, d
 
 	case req.Method == "ping", strings.HasPrefix(req.Method, "notifications/"):
-		return g.forward(principal, service, up, req)
+		return g.forward(principal, service, up, req, fields)
 	}
 	return nil, deny("method", "method %q not permitted", req.Method)
 }
@@ -218,11 +226,21 @@ func (g *Gateway) verifiedTools(up Upstream, want string, id json.RawMessage) ([
 
 // forward records the intent to call upstream before making the call, so no
 // side effect can happen without an audit record.
-func (g *Gateway) forward(principal, service string, up Upstream, req mcpx.Request) (*mcpx.Response, *decision) {
-	if _, err := g.Audit.Append(principal, "forward", "allow", clip(service+" "+req.Method, 512)); err != nil {
+func (g *Gateway) forward(principal, service string, up Upstream, req mcpx.Request, fields map[string]string) (*mcpx.Response, *decision) {
+	if _, err := g.Audit.AppendFields(principal, "forward", "allow", clip(service+" "+req.Method, 512), fields); err != nil {
 		return nil, &decision{code: http.StatusServiceUnavailable, action: "audit", detail: "audit unavailable"}
 	}
+	start := time.Now()
 	resp, err := mcpx.Call(g.Client, up.URL, req)
+	fields["duration_ms"] = strconv.FormatInt(time.Since(start).Milliseconds(), 10)
+	switch {
+	case err != nil:
+		fields["outcome"] = "unreachable"
+	case resp.Error != nil:
+		fields["outcome"] = "upstream_error"
+	default:
+		fields["outcome"] = "ok"
+	}
 	if err != nil {
 		d := deny("upstream", "upstream call failed")
 		d.cause = err.Error()
@@ -342,6 +360,23 @@ func hasTool(tools []manifest.Tool, name string) bool {
 }
 
 func (g *Gateway) write(w http.ResponseWriter, principal, service string, req mcpx.Request, d *decision, resp *mcpx.Response) {
+	g.writeFields(w, principal, service, req, d, resp, nil)
+}
+
+// argsDigest is the SHA-256 of the canonical form of a tool call's arguments.
+func argsDigest(args json.RawMessage) string {
+	if len(args) == 0 {
+		args = json.RawMessage("null")
+	}
+	c, err := manifest.Canonicalize(args)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(c)
+	return hex.EncodeToString(sum[:])
+}
+
+func (g *Gateway) writeFields(w http.ResponseWriter, principal, service string, req mcpx.Request, d *decision, resp *mcpx.Response, fields map[string]string) {
 	action := req.Method
 	result, detail := "allow", ""
 	if d != nil {
@@ -350,7 +385,7 @@ func (g *Gateway) write(w http.ResponseWriter, principal, service string, req mc
 			detail += " cause: " + d.cause
 		}
 	}
-	if _, err := g.Audit.Append(clip(principal, 256), clip(action, 128), result, clip(service+" "+req.Method+" "+detail, 1024)); err != nil && d == nil {
+	if _, err := g.Audit.AppendFields(clip(principal, 256), clip(action, 128), result, clip(service+" "+req.Method+" "+detail, 1024), fields); err != nil && d == nil {
 		// Fail closed: an unauditable allow becomes a deny.
 		d, resp = &decision{code: http.StatusServiceUnavailable, action: "audit", detail: "audit unavailable"}, nil
 	}

@@ -27,6 +27,13 @@ type State struct {
 	// RevokedKeys are signer keys the root has revoked. They are kept for
 	// good, so a later feed that omits a revocation cannot undo it.
 	RevokedKeys []string `json:"revokedKeys,omitempty"`
+	// RevokedCerts maps a revoked certificate's digest to the reason. Like
+	// RevokedKeys it is kept for good: a later feed that leaves a revocation
+	// out does not reinstate the service.
+	RevokedCerts map[string]string `json:"revokedCerts,omitempty"`
+	// Feed is the signed feed the listings were derived from. LoadVerified
+	// re-checks it, so the state file is not trusted on its own.
+	Feed *attest.Envelope `json:"feed,omitempty"`
 }
 
 func NewState() *State { return &State{Listings: map[string]*Listing{}} }

@@ -226,6 +226,18 @@
       }
     },
     {
+      "id": "MCP-SPEC",
+      "title": "Model Context Protocol specification, revision 2026-07-28",
+      "publisher": "Agentic AI Foundation (Linux Foundation)",
+      "version": "2026-07-28",
+      "url": "https://modelcontextprotocol.io/specification/2026-07-28/changelog",
+      "verified": "not verified",
+      "note": "Not opened from this repository's sessions: the site was unreachable. Clause text is taken from the design review, which opened the changelog on 12 November 2026. Verify before relying on it.",
+      "clauses": {
+        "MCP-REV-2026-07-28": "Current protocol revision: stateless operation; server/discover replaces the initialize handshake; new result types and tool-list fields"
+      }
+    },
+    {
       "id": "INNOVOX",
       "title": "Innovox Assured scheme rules",
       "publisher": "Innovox",

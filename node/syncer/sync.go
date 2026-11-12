@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"crypto/ed25519"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -51,15 +52,32 @@ func Apply(st *State, env attest.Envelope, rootPub ed25519.PublicKey, now time.T
 	if idx.Seq <= st.Seq {
 		return ErrReplay
 	}
-	revoked := map[string]string{}
-	for _, r := range idx.Revocations {
-		revoked[r.CertDigest] = r.Reason
+	if st.RevokedCerts == nil {
+		st.RevokedCerts = map[string]string{}
 	}
-	keys := kr.SignerKeys(now)
+	for _, r := range idx.Revocations {
+		st.RevokedCerts[r.CertDigest] = r.Reason
+	}
+	st.Seq, st.FeedTime, st.SyncedAt, st.FeedKeyID, st.Feed = idx.Seq, idx.CreatedAt, now, signer, &env
+	st.Listings = derive(idx, kr, now, st.RevokedCerts)
+	return nil
+}
+
+// derive builds the listings for a verified feed. A certificate is listed if
+// it was signed by an unrevoked key that the root had delegated at the time
+// the certificate was issued, was not issued in the future, and has not
+// expired. The signing key does not need to be current: a certificate
+// outlives the routine rotation of the key that signed it.
+func derive(idx feed.Index, kr *trust.Keyring, now time.Time, revoked map[string]string) map[string]*Listing {
+	keys := kr.AllSignerKeys()
 	listings := map[string]*Listing{}
 	for _, c := range idx.Certificates {
-		stmt, err := attest.OpenCertificate(c, keys)
-		if err != nil || !now.Before(stmt.Predicate.ExpiresAt) {
+		stmt, signer, err := attest.OpenCertificateWithSigner(c, keys)
+		if err != nil {
+			continue
+		}
+		issued := stmt.Predicate.IssuedAt
+		if !kr.ValidAt(signer, issued) || issued.After(now.Add(MaxClockSkew)) || !now.Before(stmt.Predicate.ExpiresAt) {
 			continue
 		}
 		d := feed.CertDigest(c)
@@ -67,6 +85,52 @@ func Apply(st *State, env attest.Envelope, rootPub ed25519.PublicKey, now time.T
 		listings[ListingKey(stmt.Predicate.Service.Name, stmt.Predicate.Service.Version)] =
 			&Listing{Cert: stmt, CertDigest: d, Revoked: isRevoked, RevokeReason: reason}
 	}
-	st.Seq, st.FeedTime, st.SyncedAt, st.Listings, st.FeedKeyID = idx.Seq, idx.CreatedAt, now, listings, signer
-	return nil
+	return listings
+}
+
+// LoadVerified loads the node state and rebuilds its listings from the signed
+// feed stored inside it, checked against the pinned root. Anything in the
+// file that the signed feed does not support, such as a forged listing or a
+// cleared revocation flag, is discarded. A state file whose feed is missing
+// or does not verify is an error, and the gateway then denies everything.
+//
+// The feed's signature is checked as at the time the feed was created, so a
+// node keeps working through its grace period after a signer key expires.
+// LoadVerified cannot detect the whole file being swapped for an older valid
+// one: that needs a monotonic counter held outside the file.
+func LoadVerified(path string, rootPub ed25519.PublicKey, now time.Time) (*State, error) {
+	st, err := Load(path)
+	if err != nil {
+		return nil, err
+	}
+	if st.Feed == nil {
+		if st.Seq != 0 || len(st.Listings) != 0 {
+			return nil, errors.New("syncer: state has listings but no signed feed")
+		}
+		return st, nil
+	}
+	var peek feed.Index
+	if err := json.Unmarshal(st.Feed.Payload, &peek); err != nil {
+		return nil, fmt.Errorf("syncer: stored feed: %w", err)
+	}
+	kr := trust.NewKeyring(rootPub)
+	for _, id := range st.RevokedKeys {
+		kr.Revoke(id)
+	}
+	idx, signer, err := feed.OpenWithSigner(*st.Feed, kr, peek.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("syncer: stored feed: %w", err)
+	}
+	if idx.Seq != st.Seq {
+		return nil, errors.New("syncer: state sequence does not match its signed feed")
+	}
+	if st.RevokedCerts == nil {
+		st.RevokedCerts = map[string]string{}
+	}
+	for _, r := range idx.Revocations {
+		st.RevokedCerts[r.CertDigest] = r.Reason
+	}
+	st.RevokedKeys, st.FeedTime, st.FeedKeyID = kr.Revoked(), idx.CreatedAt, signer
+	st.Listings = derive(idx, kr, now, st.RevokedCerts)
+	return st, nil
 }

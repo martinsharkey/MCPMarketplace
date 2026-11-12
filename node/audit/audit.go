@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"strings"
 	"sync"
@@ -30,6 +31,9 @@ type Event struct {
 	Action   string    `json:"action"`
 	Decision string    `json:"decision"`
 	Detail   string    `json:"detail"`
+	// Fields are structured facts about the decision, such as the tool
+	// called and a digest of its arguments.
+	Fields map[string]string `json:"fields,omitempty"`
 }
 
 type Log struct {
@@ -63,9 +67,19 @@ func (l *Log) Close() error { return l.f.Close() }
 
 // Append writes one event and syncs it to disk before returning.
 func (l *Log) Append(actor, action, decision, detail string) (Event, error) {
+	return l.AppendFields(actor, action, decision, detail, nil)
+}
+
+// AppendFields is Append with structured fields.
+func (l *Log) AppendFields(actor, action, decision, detail string, fields map[string]string) (Event, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	e := Event{Seq: l.seq + 1, PrevHash: l.prev, TS: l.Now().UTC(), Actor: actor, Action: action, Decision: decision, Detail: detail}
+	if len(fields) == 0 {
+		fields = nil
+	} else {
+		fields = maps.Clone(fields)
+	}
+	e := Event{Seq: l.seq + 1, PrevHash: l.prev, TS: l.Now().UTC(), Actor: actor, Action: action, Decision: decision, Detail: detail, Fields: fields}
 	h, err := hashEvent(e)
 	if err != nil {
 		return Event{}, err

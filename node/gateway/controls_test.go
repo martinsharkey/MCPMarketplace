@@ -261,3 +261,59 @@ func TestUpstreamFailureCauseIsAuditedButNotReturned(t *testing.T) {
 		t.Fatalf("cause not in audit:\n%s", b)
 	}
 }
+
+func lastAudit(t *testing.T, path, action string) map[string]string {
+	t.Helper()
+	b, _ := os.ReadFile(path)
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		var e audit.Event
+		if json.Unmarshal([]byte(lines[i]), &e) == nil && e.Action == action {
+			if e.Fields == nil {
+				return map[string]string{}
+			}
+			return e.Fields
+		}
+	}
+	t.Fatalf("no audit event with action %q", action)
+	return nil
+}
+
+func TestAuditRecordIdentifiesTheCall(t *testing.T) {
+	conformance.Covers(t, "IAS-AUD-05")
+	r := newRig(t)
+	code, _ := r.do(t, "tok-alice", "tools/call", `{"name":"echo","arguments":{"text":"hi","n":1}}`)
+	if code != 200 {
+		t.Fatalf("call: %d", code)
+	}
+	listing := r.state.Listings[svc]
+	for _, action := range []string{"forward", "tools/call"} {
+		f := lastAudit(t, r.auditFn, action)
+		if f["tool"] != "echo" || len(f["args_sha256"]) != 64 || f["cert_digest"] != listing.CertDigest || f["manifest_sha256"] != listing.Cert.Predicate.ManifestSHA256 {
+			t.Fatalf("%s record does not identify the call: %v", action, f)
+		}
+	}
+	out := lastAudit(t, r.auditFn, "tools/call")
+	if out["outcome"] != "ok" || out["duration_ms"] == "" {
+		t.Fatalf("outcome not recorded: %v", out)
+	}
+	// The arguments themselves must not be in the log, only their digest.
+	b, _ := os.ReadFile(r.auditFn)
+	if strings.Contains(string(b), `"hi"`) {
+		t.Fatal("call arguments written to the audit log")
+	}
+	// Same arguments in a different key order give the same digest.
+	r.do(t, "tok-alice", "tools/call", `{"name":"echo","arguments":{"n":1,"text":"hi"}}`)
+	if lastAudit(t, r.auditFn, "forward")["args_sha256"] != out["args_sha256"] {
+		t.Fatal("argument digest depends on key order")
+	}
+}
+
+func TestAuditRecordNamesToolOnDenial(t *testing.T) {
+	conformance.Covers(t, "IAS-AUD-05")
+	r := newRig(t)
+	call(r, t, "tok-bob", "add") // bob is not granted "add"
+	if f := lastAudit(t, r.auditFn, "policy"); f["tool"] != "add" {
+		t.Fatalf("denied tool not recorded: %v", f)
+	}
+}

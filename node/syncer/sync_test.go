@@ -212,3 +212,151 @@ func TestKeyRevocationsSurviveSaveAndLoad(t *testing.T) {
 		t.Fatal("revocation forgotten after restart")
 	}
 }
+
+func pubOf(priv ed25519.PrivateKey) ed25519.PublicKey { return priv.Public().(ed25519.PublicKey) }
+
+// renew gives p a fresh signer key at time at (a routine rotation, with no
+// revocation) and returns the PKI as it was before.
+func renew(p *testpki.PKI, at time.Time) *testpki.PKI {
+	prev := *p
+	fresh := testpki.New(at)
+	p.SignerPriv, p.SignerID = fresh.SignerPriv, trust.KeyID(pubOf(fresh.SignerPriv))
+	p.Delegation = trust.Delegate(p.RootPriv, pubOf(fresh.SignerPriv), at.AddDate(0, 0, 90))
+	p.Now = at
+	return &prev
+}
+
+func shortLived(at time.Time) *testpki.PKI {
+	p := testpki.New(at)
+	p.Delegation = trust.Delegate(p.RootPriv, pubOf(p.SignerPriv), at.AddDate(0, 0, 90))
+	return p
+}
+
+func TestCertificateRevocationPersistsWhenLaterFeedOmitsIt(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-06")
+	p := testpki.New(now)
+	st := NewState()
+	c := p.Cert("uk.example/echo", testpki.EchoTools(), now)
+	revs := []feed.Revocation{{CertDigest: feed.CertDigest(c), Reason: "vulnerable", RevokedAt: now}}
+	_ = Apply(st, p.Feed(1, []attest.Envelope{c}, revs), p.RootPub, now)
+	if err := Apply(st, p.Feed(2, []attest.Envelope{c}, nil), p.RootPub, now); err != nil {
+		t.Fatal(err)
+	}
+	if l := st.Listings["uk.example/echo@1.0.0"]; l == nil || !l.Revoked {
+		t.Fatalf("revocation undone by a later feed that left it out: %+v", l)
+	}
+}
+
+func TestCertificateSurvivesSignerKeyRotation(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-07")
+	p := shortLived(now)
+	cert := p.Cert("uk.example/echo", testpki.EchoTools(), now)
+	later := now.AddDate(0, 0, 120) // the first signer key expired 30 days ago
+	old := renew(p, later)
+	st := NewState()
+	f := p.FeedWith(1, []attest.Envelope{cert}, nil, []attest.Envelope{old.Delegation}, nil)
+	if err := Apply(st, f, p.RootPub, later); err != nil {
+		t.Fatal(err)
+	}
+	if st.Listings["uk.example/echo@1.0.0"] == nil {
+		t.Fatal("a 12-month certificate was dropped when its 90-day signing key was rotated")
+	}
+}
+
+func TestCertificateIssuedOutsideItsKeysLifetimeRejected(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-07")
+	p := shortLived(now)
+	later := now.AddDate(0, 0, 120)
+	lateCert := p.Cert("uk.example/late", testpki.EchoTools(), now.AddDate(0, 0, 100)) // signed after the key expired
+	futureCert := p.Cert("uk.example/future", testpki.EchoTools(), later.AddDate(0, 0, 2))
+	old := renew(p, later)
+	st := NewState()
+	f := p.FeedWith(1, []attest.Envelope{lateCert, futureCert}, nil, []attest.Envelope{old.Delegation}, nil)
+	if err := Apply(st, f, p.RootPub, later); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Listings) != 0 {
+		t.Fatalf("certificate issued outside its key's lifetime, or in the future, was listed: %v", st.Listings)
+	}
+}
+
+func savedState(t *testing.T, p *testpki.PKI, revs bool) (string, attest.Envelope) {
+	t.Helper()
+	st := NewState()
+	c := p.Cert("uk.example/echo", testpki.EchoTools(), now)
+	var r []feed.Revocation
+	if revs {
+		r = []feed.Revocation{{CertDigest: feed.CertDigest(c), Reason: "vulnerable", RevokedAt: now}}
+	}
+	if err := Apply(st, p.Feed(1, []attest.Envelope{c}, r), p.RootPub, now); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := st.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	return path, c
+}
+
+func tamper(t *testing.T, path string, fn func(*State)) {
+	t.Helper()
+	st, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn(st)
+	if err := st.Save(path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoadVerifiedDropsForgedListing(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-08")
+	p, evil := testpki.New(now), testpki.New(now)
+	path, _ := savedState(t, p, false)
+	tamper(t, path, func(st *State) {
+		forged, _ := attest.OpenCertificate(evil.Cert("uk.example/evil", testpki.EchoTools(), now), map[string]ed25519.PublicKey{evil.SignerID: pubOf(evil.SignerPriv)})
+		st.Listings["uk.example/evil@1.0.0"] = &Listing{Cert: forged, CertDigest: "00"}
+	})
+	st, err := LoadVerified(path, p.RootPub, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Listings["uk.example/evil@1.0.0"] != nil || st.Listings["uk.example/echo@1.0.0"] == nil {
+		t.Fatalf("forged listing served from the state file: %v", st.Listings)
+	}
+}
+
+func TestLoadVerifiedRestoresRevocationFlag(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-08")
+	p := testpki.New(now)
+	path, _ := savedState(t, p, true)
+	tamper(t, path, func(st *State) { st.Listings["uk.example/echo@1.0.0"].Revoked = false })
+	st, err := LoadVerified(path, p.RootPub, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.Listings["uk.example/echo@1.0.0"].Revoked {
+		t.Fatal("revocation cleared by editing the state file")
+	}
+}
+
+func TestLoadVerifiedRejectsTamperedOrMissingFeed(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-08")
+	p := testpki.New(now)
+	path, _ := savedState(t, p, false)
+	tamper(t, path, func(st *State) { st.Feed.Payload = append(st.Feed.Payload, ' ') })
+	if _, err := LoadVerified(path, p.RootPub, now); err == nil {
+		t.Fatal("tampered feed accepted")
+	}
+	path, _ = savedState(t, p, false)
+	tamper(t, path, func(st *State) { st.Feed = nil })
+	if _, err := LoadVerified(path, p.RootPub, now); err == nil {
+		t.Fatal("state with listings but no signed feed accepted")
+	}
+	path, _ = savedState(t, p, false)
+	other := testpki.New(now)
+	if _, err := LoadVerified(path, other.RootPub, now); err == nil {
+		t.Fatal("state verified under the wrong root")
+	}
+}
