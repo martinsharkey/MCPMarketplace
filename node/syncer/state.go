@@ -22,6 +22,11 @@ type State struct {
 	FeedTime time.Time           `json:"feedTime"`
 	SyncedAt time.Time           `json:"syncedAt"`
 	Listings map[string]*Listing `json:"listings"`
+	// FeedKeyID is the signer key of the feed currently applied.
+	FeedKeyID string `json:"feedKeyId,omitempty"`
+	// RevokedKeys are signer keys the root has revoked. They are kept for
+	// good, so a later feed that omits a revocation cannot undo it.
+	RevokedKeys []string `json:"revokedKeys,omitempty"`
 }
 
 func NewState() *State { return &State{Listings: map[string]*Listing{}} }

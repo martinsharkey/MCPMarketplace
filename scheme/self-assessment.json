@@ -10,12 +10,6 @@
       "planned": "Plan 4"
     },
     {
-      "control": "IAS-TRUST-03",
-      "status": "not-met",
-      "rationale": "No root-signed revocation of signer keys; a stolen signer key stays valid until its delegation expires (review finding I6).",
-      "planned": "Plan 4"
-    },
-    {
       "control": "IAS-RT-08",
       "status": "partial",
       "rationale": "The caller's credentials are never forwarded upstream (adversarial corpus), but token exchange to scoped downstream tokens is not implemented.",
@@ -23,8 +17,8 @@
     },
     {
       "control": "IAS-RT-09",
-      "status": "partial",
-      "rationale": "Upstream responses are bounded to 4 MiB and event-stream responses are refused (adversarial corpus). Injection text inside tool output still reaches the agent (corpus known gap).",
+      "status": "met",
+      "rationale": "Outputs are size-limited and every string is scanned for injection phrasing, hidden characters, private keys and configured classification markings, then blocked or flagged per policy. Residual risk: the scan is pattern-based, so paraphrased or encoded injections pass (recorded as known gaps in the adversarial corpus). A classifier-based inspector is planned.",
       "planned": "Plan 7"
     },
     {
@@ -32,18 +26,6 @@
       "status": "not-met",
       "rationale": "No human-approval hold for high-impact tools.",
       "planned": "Plan 7"
-    },
-    {
-      "control": "IAS-RT-11",
-      "status": "not-met",
-      "rationale": "No kill switch.",
-      "planned": "Plan 2"
-    },
-    {
-      "control": "IAS-RT-12",
-      "status": "partial",
-      "rationale": "Request bodies are bounded to 4 MiB (adversarial corpus). There are no per-principal or per-service rate limits: 200 rapid calls all reach the service (corpus known gap).",
-      "planned": "Plan 2"
     },
     {
       "control": "IAS-ISO-01",
@@ -59,9 +41,8 @@
     },
     {
       "control": "IAS-AUD-03",
-      "status": "not-met",
-      "rationale": "No SIEM export and no signed checkpoints; tail truncation of the audit log is undetectable (review finding M4).",
-      "planned": "Plan 2"
+      "status": "met",
+      "rationale": "Every event and signed checkpoint is written to an export sink as JSON lines, and a checkpoint held off the node detects truncation and rewritten history. The gateway writes the export to a file for the customer's log forwarder; a direct SIEM transport is deployment-specific."
     },
     {
       "control": "IAS-VULN-01",

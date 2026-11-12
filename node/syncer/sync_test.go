@@ -12,6 +12,7 @@ import (
 	"innovox.uk/assured/internal/testpki"
 	"innovox.uk/assured/pkg/attest"
 	"innovox.uk/assured/pkg/feed"
+	"innovox.uk/assured/pkg/trust"
 )
 
 var now = time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
@@ -129,5 +130,85 @@ func TestApplyRejectsFutureDatedFeed(t *testing.T) {
 	st := NewState()
 	if err := Apply(st, p.Feed(1, nil, nil), p.RootPub, now); err == nil {
 		t.Fatal("future-dated feed accepted")
+	}
+}
+
+// rotate gives p a second signer key and returns a root-signed revocation of the first.
+func rotate(p *testpki.PKI) (old *testpki.PKI, revocation attest.Envelope) {
+	prev := *p
+	fresh := testpki.New(p.Now)
+	p.SignerPriv, p.SignerID = fresh.SignerPriv, trust.KeyID(fresh.SignerPriv.Public().(ed25519.PublicKey))
+	p.Delegation = trust.Delegate(p.RootPriv, fresh.SignerPriv.Public().(ed25519.PublicKey), p.Now.AddDate(1, 0, 0))
+	return &prev, trust.RevokeKey(p.RootPriv, prev.SignerID, "signer key compromised", p.Now)
+}
+
+func TestRevokedSignerKeyDropsItsCertificates(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-03")
+	p := testpki.New(now)
+	st := NewState()
+	oldCert := p.Cert("uk.example/echo", testpki.EchoTools(), now)
+	_ = Apply(st, p.Feed(1, []attest.Envelope{oldCert}, nil), p.RootPub, now)
+	old, rev := rotate(p)
+	newCert := p.Cert("uk.example/new", testpki.EchoTools(), now)
+	f := p.FeedWith(2, []attest.Envelope{oldCert, newCert}, nil, []attest.Envelope{old.Delegation}, []attest.Envelope{rev})
+	if err := Apply(st, f, p.RootPub, now); err != nil {
+		t.Fatal(err)
+	}
+	if st.Listings["uk.example/echo@1.0.0"] != nil || st.Listings["uk.example/new@1.0.0"] == nil {
+		t.Fatalf("listings after key revocation: %v", st.Listings)
+	}
+}
+
+func TestRevokedSignerKeyCannotPublishLater(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-03")
+	p := testpki.New(now)
+	st := NewState()
+	_ = Apply(st, p.Feed(1, nil, nil), p.RootPub, now)
+	old, rev := rotate(p)
+	_ = Apply(st, p.FeedWith(2, nil, nil, nil, []attest.Envelope{rev}), p.RootPub, now)
+	// The thief publishes a higher-numbered feed that leaves the revocation out.
+	evil := old.Feed(3, []attest.Envelope{old.Cert("uk.example/evil", testpki.EchoTools(), now)}, nil)
+	if err := Apply(st, evil, p.RootPub, now); err == nil {
+		t.Fatal("feed signed by a revoked key accepted")
+	}
+	if st.Seq != 2 || len(st.Listings) != 0 {
+		t.Fatalf("state changed by revoked signer: seq %d", st.Seq)
+	}
+}
+
+func TestRecoversFromSequencePoisoningByStolenKey(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-03")
+	p := testpki.New(now)
+	st := NewState()
+	_ = Apply(st, p.Feed(1, nil, nil), p.RootPub, now)
+	// Before the node learns of the theft, the thief publishes a huge
+	// sequence number to lock out honest feeds.
+	thief := *p
+	poison := thief.Feed(1<<62, []attest.Envelope{thief.Cert("uk.example/evil", testpki.EchoTools(), now)}, nil)
+	if err := Apply(st, poison, p.RootPub, now); err != nil {
+		t.Fatal(err)
+	}
+	_, rev := rotate(p)
+	honest := p.FeedWith(2, []attest.Envelope{p.Cert("uk.example/good", testpki.EchoTools(), now)}, nil, nil, []attest.Envelope{rev})
+	if err := Apply(st, honest, p.RootPub, now); err != nil {
+		t.Fatalf("honest feed locked out: %v", err)
+	}
+	if st.Seq != 2 || st.Listings["uk.example/evil@1.0.0"] != nil || st.Listings["uk.example/good@1.0.0"] == nil {
+		t.Fatalf("did not recover: seq %d listings %v", st.Seq, st.Listings)
+	}
+}
+
+func TestKeyRevocationsSurviveSaveAndLoad(t *testing.T) {
+	conformance.Covers(t, "IAS-TRUST-03")
+	p := testpki.New(now)
+	st := NewState()
+	_ = Apply(st, p.Feed(1, nil, nil), p.RootPub, now)
+	old, rev := rotate(p)
+	_ = Apply(st, p.FeedWith(2, nil, nil, nil, []attest.Envelope{rev}), p.RootPub, now)
+	path := filepath.Join(t.TempDir(), "state.json")
+	_ = st.Save(path)
+	back, _ := Load(path)
+	if err := Apply(back, old.Feed(9, nil, nil), p.RootPub, now); err == nil {
+		t.Fatal("revocation forgotten after restart")
 	}
 }
